@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -127,7 +126,7 @@ const Deposit = () => {
     setAmount(value.toString());
   };
 
-  const payWithPaystack = async (depositAmount: number): Promise<boolean> => {
+  const payWithPaystack = async (depositAmount: number, depositId: string): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       if (!window.PaystackPop) {
         reject(new Error("Paystack not loaded. Please refresh the page and try again."));
@@ -144,7 +143,8 @@ const Deposit = () => {
       console.log("Initiating Paystack payment:", {
         amount: depositAmount,
         amountInCents: depositAmount * 100,
-        reference: ref
+        reference: ref,
+        depositId
       });
 
       try {
@@ -164,17 +164,40 @@ const Deposit = () => {
             resolve(true);
           },
           onClose: function() {
-            console.log("Paystack payment popup closed");
-            reject(new Error("Payment was cancelled. Please try again."));
+            console.log("Paystack payment popup closed - marking as cancelled");
+            // Update the deposit status to cancelled when popup is closed
+            updateDepositStatus(depositId, "cancelled");
+            reject(new Error("Payment was cancelled. The transaction has been recorded as cancelled."));
           }
         });
         
         handler.openIframe();
       } catch (error) {
         console.error("Error opening Paystack iframe:", error);
+        // Update the deposit status to failed if there's an error
+        updateDepositStatus(depositId, "failed");
         reject(new Error("Failed to open payment popup. Please try again."));
       }
     });
+  };
+
+  const updateDepositStatus = async (depositId: string, status: string) => {
+    try {
+      const { error } = await supabase
+        .from("deposits")
+        .update({ status })
+        .eq("id", depositId);
+
+      if (error) {
+        console.error("Error updating deposit status:", error);
+      } else {
+        console.log(`Deposit ${depositId} status updated to: ${status}`);
+        // Refresh deposits list to show updated status
+        await fetchDeposits();
+      }
+    } catch (error) {
+      console.error("Error updating deposit status:", error);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -205,16 +228,41 @@ const Deposit = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
+      // Create deposit record immediately when payment is initiated
+      console.log("Creating deposit record for amount:", depositAmount);
+      const { data: depositData, error: depositError } = await supabase
+        .from("deposits")
+        .insert({
+          user_id: user.id,
+          amount: depositAmount,
+          payment_method: paymentMethod,
+          status: "pending",
+        })
+        .select()
+        .single();
+
+      if (depositError) {
+        console.error("Error creating deposit record:", depositError);
+        throw new Error("Failed to create deposit record. Please try again.");
+      }
+
+      const depositId = depositData.id;
+      console.log("Deposit record created with ID:", depositId);
+
+      // Refresh deposits list to show the new pending transaction
+      await fetchDeposits();
+
       let paymentSuccess = false;
 
       // Handle M-Pesa payment via Paystack
       if (paymentMethod === "mpesa") {
         if (!paystackLoaded) {
+          await updateDepositStatus(depositId, "failed");
           throw new Error("Payment system is still loading. Please wait a moment and try again.");
         }
 
         try {
-          paymentSuccess = await payWithPaystack(depositAmount);
+          paymentSuccess = await payWithPaystack(depositAmount, depositId);
         } catch (error) {
           console.error("M-Pesa payment error:", error);
           const errorMessage = error instanceof Error ? error.message : "Payment failed. Please try again.";
@@ -226,7 +274,8 @@ const Deposit = () => {
           return;
         }
       } else {
-        // For other payment methods, show that they're not implemented yet
+        // For other payment methods, mark as failed and show that they're not implemented yet
+        await updateDepositStatus(depositId, "failed");
         toast({
           title: "Payment Method Not Available",
           description: `${paymentMethods.find(m => m.id === paymentMethod)?.name} is coming soon. Please use M-Pesa for now.`,
@@ -238,20 +287,8 @@ const Deposit = () => {
       if (paymentSuccess) {
         console.log("Processing successful payment for amount:", depositAmount);
 
-        // Create deposit record
-        const { error: depositError } = await supabase
-          .from("deposits")
-          .insert({
-            user_id: user.id,
-            amount: depositAmount,
-            payment_method: paymentMethod,
-            status: "completed",
-          });
-
-        if (depositError) {
-          console.error("Error creating deposit record:", depositError);
-          throw new Error("Failed to record deposit. Please contact support with your payment reference.");
-        }
+        // Update deposit status to completed
+        await updateDepositStatus(depositId, "completed");
 
         // Get current balance
         const { data: profile, error: profileError } = await supabase
@@ -320,6 +357,8 @@ const Deposit = () => {
         return 'text-green-600';
       case 'pending':
         return 'text-yellow-600';
+      case 'cancelled':
+        return 'text-orange-600';
       case 'failed':
         return 'text-red-600';
       default:
@@ -501,6 +540,8 @@ const Deposit = () => {
             <p>• Only M-Pesa is currently available - other methods coming soon</p>
             <p>• Deposits are usually processed instantly</p>
             <p>• Transactions are automatically checked every 30 seconds</p>
+            <p>• All payment attempts are recorded, including cancelled transactions</p>
+            <p>• You can see the status of all your transactions in the deposit history</p>
             <p>• All payments are secure and encrypted</p>
             <p>• Contact support if you encounter any issues</p>
             <p>• Keep your payment reference for support inquiries</p>
