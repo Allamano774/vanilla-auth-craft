@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,16 @@ import DashboardLayout from "@/components/Layout/DashboardLayout";
 declare global {
   interface Window {
     PaystackPop: {
-      setup: (config: any) => {
+      setup: (config: {
+        key: string;
+        email: string;
+        amount: number;
+        currency: string;
+        ref: string;
+        label: string;
+        callback: (response: any) => void;
+        onClose: () => void;
+      }) => {
         openIframe: () => void;
       };
     };
@@ -60,7 +70,7 @@ const Deposit = () => {
     loadPaystack();
   }, [toast]);
 
-  // Fetch user's deposit history
+  // Fetch user's completed deposit history only
   const fetchDeposits = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -70,6 +80,7 @@ const Deposit = () => {
         .from("deposits")
         .select("*")
         .eq("user_id", user.id)
+        .eq("status", "completed") // Only show completed deposits
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -110,7 +121,7 @@ const Deposit = () => {
     setAutoRefreshing(false);
     toast({
       title: "Deposits Refreshed",
-      description: "Your deposit history has been updated.",
+      description: "Your completed deposit history has been updated.",
     });
   };
 
@@ -126,7 +137,7 @@ const Deposit = () => {
     setAmount(value.toString());
   };
 
-  const payWithPaystack = async (depositAmount: number, depositId: string, transactionRef: string): Promise<boolean> => {
+  const payWithPaystack = async (depositAmount: number, depositId: string, transactionRef: string, userEmail: string): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       if (!window.PaystackPop) {
         reject(new Error("Paystack not loaded. Please refresh the page and try again."));
@@ -142,13 +153,14 @@ const Deposit = () => {
         amount: depositAmount,
         amountInCents: depositAmount * 100,
         reference: transactionRef,
-        depositId
+        depositId,
+        email: userEmail
       });
 
       try {
         const handler = window.PaystackPop.setup({
           key: 'pk_live_c8d72323ec70238b1fb7ce3d5a42494560fbe815', 
-          email: 'customer@example.com',
+          email: userEmail, // Use actual user email
           amount: depositAmount * 100, // Convert to cents (Paystack expects amount in kobo/cents)
           currency: 'KES',
           ref: transactionRef,
@@ -282,7 +294,7 @@ const Deposit = () => {
         }
 
         try {
-          paymentSuccess = await payWithPaystack(depositAmount, depositId, transactionRef);
+          paymentSuccess = await payWithPaystack(depositAmount, depositId, transactionRef, user.email!);
         } catch (error) {
           console.error("M-Pesa payment error:", error);
           const errorMessage = error instanceof Error ? error.message : "Payment failed. Please try again.";
@@ -366,21 +378,6 @@ const Deposit = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'text-green-600';
-      case 'pending':
-        return 'text-yellow-600';
-      case 'cancelled':
-        return 'text-orange-600';
-      case 'failed':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
-    }
   };
 
   return (
@@ -474,13 +471,13 @@ const Deposit = () => {
             </CardContent>
           </Card>
 
-          {/* Deposit History */}
+          {/* Completed Deposit History */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <History className="w-5 h-5" />
-                  Deposit History
+                  Successful Deposits
                 </div>
                 <Button
                   variant="outline"
@@ -510,8 +507,8 @@ const Deposit = () => {
               ) : deposits.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No deposits found</p>
-                  <p className="text-sm">Your deposit history will appear here</p>
+                  <p>No successful deposits found</p>
+                  <p className="text-sm">Your completed deposits will appear here</p>
                 </div>
               ) : (
                 <div className="max-h-96 overflow-y-auto">
@@ -519,7 +516,6 @@ const Deposit = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
                         <TableHead>Reference</TableHead>
                         <TableHead>Date</TableHead>
                       </TableRow>
@@ -527,13 +523,8 @@ const Deposit = () => {
                     <TableBody>
                       {deposits.map((deposit) => (
                         <TableRow key={deposit.id}>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium text-green-600">
                             KES {Number(deposit.amount).toFixed(2)}
-                          </TableCell>
-                          <TableCell>
-                            <span className={`capitalize ${getStatusColor(deposit.status)}`}>
-                              {deposit.status}
-                            </span>
                           </TableCell>
                           <TableCell className="text-xs text-gray-600 font-mono">
                             {deposit.transaction_reference || 'N/A'}
@@ -560,10 +551,7 @@ const Deposit = () => {
             <p>• M-Pesa payments are processed via Paystack</p>
             <p>• Only M-Pesa is currently available - other methods coming soon</p>
             <p>• Deposits are usually processed instantly</p>
-            <p>• Transactions are automatically checked every 30 seconds</p>
-            <p>• All payment attempts are recorded with unique transaction references</p>
-            <p>• You can see the status and reference code of all transactions, including cancelled ones</p>
-            <p>• Transaction references help with support inquiries and tracking</p>
+            <p>• Only successful deposits are displayed in the history</p>
             <p>• All payments are secure and encrypted</p>
             <p>• Contact support if you encounter any issues</p>
           </CardContent>
