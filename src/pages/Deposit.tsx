@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -126,7 +127,7 @@ const Deposit = () => {
     setAmount(value.toString());
   };
 
-  const payWithPaystack = async (depositAmount: number, depositId: string): Promise<boolean> => {
+  const payWithPaystack = async (depositAmount: number, depositId: string, transactionRef: string): Promise<boolean> => {
     return new Promise((resolve, reject) => {
       if (!window.PaystackPop) {
         reject(new Error("Paystack not loaded. Please refresh the page and try again."));
@@ -138,12 +139,10 @@ const Deposit = () => {
         return;
       }
 
-      const ref = 'DEPOSIT_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      
       console.log("Initiating Paystack payment:", {
         amount: depositAmount,
         amountInCents: depositAmount * 100,
-        reference: ref,
+        reference: transactionRef,
         depositId
       });
 
@@ -153,7 +152,7 @@ const Deposit = () => {
           email: 'customer@example.com',
           amount: depositAmount * 100, // Convert to cents (Paystack expects amount in kobo/cents)
           currency: 'KES',
-          ref: ref,
+          ref: transactionRef,
           label: "Account Deposit",
           callback: function(response: any) {
             console.log("Paystack payment successful:", response);
@@ -164,10 +163,10 @@ const Deposit = () => {
             resolve(true);
           },
           onClose: function() {
-            console.log("Paystack payment popup closed - marking as cancelled");
+            console.log("Paystack payment popup closed - marking as cancelled with reference:", transactionRef);
             // Update the deposit status to cancelled when popup is closed
             updateDepositStatus(depositId, "cancelled");
-            reject(new Error("Payment was cancelled. The transaction has been recorded as cancelled."));
+            reject(new Error(`Payment was cancelled. Transaction reference: ${transactionRef}`));
           }
         });
         
@@ -228,8 +227,11 @@ const Deposit = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
+      // Generate transaction reference
+      const transactionRef = 'DEPOSIT_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
       // Create deposit record immediately when payment is initiated
-      console.log("Creating deposit record for amount:", depositAmount);
+      console.log("Creating deposit record for amount:", depositAmount, "with reference:", transactionRef);
       const { data: depositData, error: depositError } = await supabase
         .from("deposits")
         .insert({
@@ -237,6 +239,7 @@ const Deposit = () => {
           amount: depositAmount,
           payment_method: paymentMethod,
           status: "pending",
+          transaction_reference: transactionRef,
         })
         .select()
         .single();
@@ -247,7 +250,7 @@ const Deposit = () => {
       }
 
       const depositId = depositData.id;
-      console.log("Deposit record created with ID:", depositId);
+      console.log("Deposit record created with ID:", depositId, "and reference:", transactionRef);
 
       // Refresh deposits list to show the new pending transaction
       await fetchDeposits();
@@ -262,12 +265,12 @@ const Deposit = () => {
         }
 
         try {
-          paymentSuccess = await payWithPaystack(depositAmount, depositId);
+          paymentSuccess = await payWithPaystack(depositAmount, depositId, transactionRef);
         } catch (error) {
           console.error("M-Pesa payment error:", error);
           const errorMessage = error instanceof Error ? error.message : "Payment failed. Please try again.";
           toast({
-            title: "Payment Failed",
+            title: "Payment Cancelled",
             description: errorMessage,
             variant: "destructive",
           });
@@ -503,6 +506,7 @@ const Deposit = () => {
                       <TableRow>
                         <TableHead>Amount</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Reference</TableHead>
                         <TableHead>Date</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -516,6 +520,9 @@ const Deposit = () => {
                             <span className={`capitalize ${getStatusColor(deposit.status)}`}>
                               {deposit.status}
                             </span>
+                          </TableCell>
+                          <TableCell className="text-xs text-gray-600 font-mono">
+                            {deposit.transaction_reference || 'N/A'}
                           </TableCell>
                           <TableCell className="text-sm text-gray-600">
                             {formatDate(deposit.created_at)}
@@ -540,11 +547,11 @@ const Deposit = () => {
             <p>• Only M-Pesa is currently available - other methods coming soon</p>
             <p>• Deposits are usually processed instantly</p>
             <p>• Transactions are automatically checked every 30 seconds</p>
-            <p>• All payment attempts are recorded, including cancelled transactions</p>
-            <p>• You can see the status of all your transactions in the deposit history</p>
+            <p>• All payment attempts are recorded with unique transaction references</p>
+            <p>• You can see the status and reference code of all transactions, including cancelled ones</p>
+            <p>• Transaction references help with support inquiries and tracking</p>
             <p>• All payments are secure and encrypted</p>
             <p>• Contact support if you encounter any issues</p>
-            <p>• Keep your payment reference for support inquiries</p>
           </CardContent>
         </Card>
       </div>
