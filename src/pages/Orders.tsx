@@ -6,37 +6,84 @@ import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type Order = Tables<"orders">;
 
 const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchOrders();
+    
+    // Auto-refresh orders every 30 seconds
+    const interval = setInterval(() => {
+      console.log("Auto-refreshing orders...");
+      setRefreshing(true);
+      fetchOrders().then(() => {
+        setRefreshing(false);
+      });
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const fetchOrders = async () => {
     try {
+      console.log("Fetching orders...");
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log("Current user:", user);
+
+      if (!user) {
+        console.log("No user found");
+        toast({
+          title: "Authentication required",
+          description: "Please log in to view your orders",
+          variant: "destructive",
+        });
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("orders")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      console.log("Orders query result:", { data, error });
+
+      if (error) {
+        console.error("Error fetching orders:", error);
+        throw error;
+      }
+      
+      console.log("Successfully fetched orders:", data?.length || 0);
       setOrders(data || []);
     } catch (error) {
       console.error("Error fetching orders:", error);
       toast({
         title: "Error",
-        description: "Failed to fetch orders",
+        description: "Failed to fetch orders. Please try again.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefreshOrders = async () => {
+    setRefreshing(true);
+    await fetchOrders();
+    setRefreshing(false);
+    toast({
+      title: "Orders Refreshed",
+      description: "Your order history has been updated.",
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -47,8 +94,12 @@ const Orders = () => {
         return "bg-blue-100 text-blue-800";
       case "cancelled":
         return "bg-red-100 text-red-800";
-      default:
+      case "approved":
+        return "bg-green-100 text-green-800";
+      case "pending":
         return "bg-yellow-100 text-yellow-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -67,15 +118,43 @@ const Orders = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Order History</h1>
-          <p className="text-gray-600">Track your service orders</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Order History</h1>
+            <p className="text-gray-600">Track your service orders</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshOrders}
+            disabled={refreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
+
+        {refreshing && (
+          <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin" />
+            Checking for new orders...
+          </div>
+        )}
 
         {orders.length === 0 ? (
           <Card>
-            <CardContent className="flex items-center justify-center py-16">
-              <p className="text-gray-500">No orders found</p>
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <p className="text-gray-500 text-lg mb-2">No orders found</p>
+              <p className="text-gray-400 text-sm">Your orders will appear here once you make a purchase</p>
+              <Button 
+                variant="outline" 
+                onClick={handleRefreshOrders}
+                className="mt-4"
+                disabled={refreshing}
+              >
+                {refreshing ? "Checking..." : "Check for Orders"}
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -101,7 +180,7 @@ const Orders = () => {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-700">Price</p>
-                      <p className="text-lg font-semibold">${order.price}</p>
+                      <p className="text-lg font-semibold">KES {Number(order.price).toFixed(2)}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-700">Date</p>
