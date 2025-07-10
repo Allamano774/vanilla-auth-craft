@@ -1,10 +1,12 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CreditCard, Smartphone, DollarSign } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CreditCard, Smartphone, DollarSign, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
@@ -25,6 +27,8 @@ const Deposit = () => {
   const [paymentMethod, setPaymentMethod] = useState("mpesa");
   const [loading, setLoading] = useState(false);
   const [paystackLoaded, setPaystackLoaded] = useState(false);
+  const [deposits, setDeposits] = useState<any[]>([]);
+  const [loadingDeposits, setLoadingDeposits] = useState(true);
   const { toast } = useToast();
 
   // Load Paystack script dynamically
@@ -56,13 +60,42 @@ const Deposit = () => {
     loadPaystack();
   }, [toast]);
 
+  // Fetch user's deposit history
+  useEffect(() => {
+    const fetchDeposits = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from("deposits")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          console.error("Error fetching deposits:", error);
+          return;
+        }
+
+        setDeposits(data || []);
+      } catch (error) {
+        console.error("Error fetching deposits:", error);
+      } finally {
+        setLoadingDeposits(false);
+      }
+    };
+
+    fetchDeposits();
+  }, []);
+
   const paymentMethods = [
     { id: "mpesa", name: "M-Pesa (Paystack)", icon: Smartphone, description: "Pay with M-Pesa via Paystack" },
     { id: "paypal", name: "PayPal", icon: CreditCard, description: "International payments (Coming Soon)" },
     { id: "card", name: "Credit/Debit Card", icon: CreditCard, description: "Visa, MasterCard (Coming Soon)" },
   ];
 
-  const quickAmounts = [100, 250, 500, 1000, 2500, 5000];
+  const quickAmounts = [2, 20, 50, 100, 250, 500];
 
   const handleQuickAmount = (value: number) => {
     setAmount(value.toString());
@@ -228,6 +261,17 @@ const Deposit = () => {
         });
 
         setAmount("");
+        
+        // Refresh deposits list
+        const { data: updatedDeposits } = await supabase
+          .from("deposits")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+        
+        if (updatedDeposits) {
+          setDeposits(updatedDeposits);
+        }
       }
     } catch (error) {
       console.error("Error processing deposit:", error);
@@ -242,94 +286,173 @@ const Deposit = () => {
     }
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'text-green-600';
+      case 'pending':
+        return 'text-yellow-600';
+      case 'failed':
+        return 'text-red-600';
+      default:
+        return 'text-gray-600';
+    }
+  };
+
   return (
     <DashboardLayout>
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Add Funds</h1>
           <p className="text-gray-600">Top up your account balance to start ordering services</p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5" />
-              Deposit Amount
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-3">
-                <Label htmlFor="amount">Enter Amount (KES)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  min="2"
-                  step="0.01"
-                  required
-                />
-                <div className="grid grid-cols-3 gap-2">
-                  {quickAmounts.map((value) => (
-                    <Button
-                      key={value}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQuickAmount(value)}
-                      className="text-sm"
-                    >
-                      KES {value}
-                    </Button>
-                  ))}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Deposit Form */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Deposit Amount
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-3">
+                  <Label htmlFor="amount">Enter Amount (KES)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    min="2"
+                    step="0.01"
+                    required
+                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    {quickAmounts.map((value) => (
+                      <Button
+                        key={value}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleQuickAmount(value)}
+                        className="text-sm"
+                      >
+                        KES {value}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-3">
-                <Label>Payment Method</Label>
-                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-                  {paymentMethods.map((method) => (
-                    <div key={method.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                      <RadioGroupItem value={method.id} id={method.id} />
-                      <div className="flex items-center space-x-3 flex-1">
-                        <method.icon className="w-5 h-5 text-gray-600" />
-                        <div>
-                          <Label htmlFor={method.id} className="font-medium cursor-pointer">
-                            {method.name}
-                          </Label>
-                          <p className="text-sm text-gray-500">{method.description}</p>
+                <div className="space-y-3">
+                  <Label>Payment Method</Label>
+                  <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
+                    {paymentMethods.map((method) => (
+                      <div key={method.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                        <RadioGroupItem value={method.id} id={method.id} />
+                        <div className="flex items-center space-x-3 flex-1">
+                          <method.icon className="w-5 h-5 text-gray-600" />
+                          <div>
+                            <Label htmlFor={method.id} className="font-medium cursor-pointer">
+                              {method.name}
+                            </Label>
+                            <p className="text-sm text-gray-500">{method.description}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </RadioGroup>
-              </div>
+                    ))}
+                  </RadioGroup>
+                </div>
 
-              {paymentMethod === "mpesa" && !paystackLoaded && (
-                <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
-                  <i className="fas fa-spinner fa-spin mr-2"></i>
-                  Loading payment system...
+                {paymentMethod === "mpesa" && !paystackLoaded && (
+                  <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+                    <i className="fas fa-spinner fa-spin mr-2"></i>
+                    Loading payment system...
+                  </div>
+                )}
+
+                <div className="pt-4">
+                  <Button
+                    type="submit"
+                    disabled={loading || !amount || (paymentMethod === "mpesa" && !paystackLoaded)}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {loading ? "Processing..." : 
+                     paymentMethod === "mpesa" ? 
+                     `Pay KES ${(parseFloat(amount || "0")).toFixed(0)} via M-Pesa` : 
+                     `Deposit KES ${amount || "0.00"}`}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Deposit History */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="w-5 h-5" />
+                Deposit History
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingDeposits ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                  <p className="text-gray-600 mt-2">Loading deposits...</p>
+                </div>
+              ) : deposits.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No deposits found</p>
+                  <p className="text-sm">Your deposit history will appear here</p>
+                </div>
+              ) : (
+                <div className="max-h-96 overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {deposits.map((deposit) => (
+                        <TableRow key={deposit.id}>
+                          <TableCell className="font-medium">
+                            KES {Number(deposit.amount).toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            <span className={`capitalize ${getStatusColor(deposit.status)}`}>
+                              {deposit.status}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-600">
+                            {formatDate(deposit.created_at)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
-
-              <div className="pt-4">
-                <Button
-                  type="submit"
-                  disabled={loading || !amount || (paymentMethod === "mpesa" && !paystackLoaded)}
-                  className="w-full"
-                  size="lg"
-                >
-                  {loading ? "Processing..." : 
-                   paymentMethod === "mpesa" ? 
-                   `Pay KES ${(parseFloat(amount || "0")).toFixed(0)} via M-Pesa` : 
-                   `Deposit KES ${amount || "0.00"}`}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card>
           <CardHeader>
