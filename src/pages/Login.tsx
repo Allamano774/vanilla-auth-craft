@@ -4,23 +4,33 @@ import { Link } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, CheckCircle, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+interface LoginFormData {
+  email: string;
+  password: string;
+}
+
+interface LoginErrors {
+  email?: string;
+  password?: string;
+}
+
 const Login = () => {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<LoginFormData>({
     email: "",
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<LoginErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const validateEmail = (email) => {
+  const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: LoginErrors = {};
 
     if (!formData.email) {
       newErrors.email = "Email is required";
@@ -38,7 +48,7 @@ const Login = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -46,7 +56,7 @@ const Login = () => {
     }));
     
     // Clear error when user starts typing
-    if (errors[name]) {
+    if (errors[name as keyof LoginErrors]) {
       setErrors(prev => ({
         ...prev,
         [name]: ""
@@ -54,7 +64,7 @@ const Login = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) {
