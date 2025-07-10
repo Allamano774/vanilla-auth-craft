@@ -20,25 +20,68 @@ const Services = () => {
       icon: <Music className="h-6 w-6" />,
       color: "from-pink-500 to-purple-600",
       services: {
+        verification: [
+          { 
+            name: "TikTok Verification (Blue Tick)", 
+            minOrder: 1, 
+            pricePerUnit: 1700, 
+            unit: "verification",
+            icon: <Badge className="h-5 w-5" />
+          },
+        ],
         followers: [
-          { quantity: 100, price: 40 },
-          { quantity: 200, price: 80 },
-          { quantity: 300, price: 130 },
-          { quantity: 500, price: 200 },
-          { quantity: 1000, price: 400 },
+          { 
+            name: "TikTok Followers", 
+            minOrder: 50, 
+            pricePerUnit: 0.46, 
+            unit: "follower",
+            icon: <Users className="h-5 w-5" />
+          },
         ],
         likes: [
-          { quantity: 100, price: 35 },
-          { quantity: 1000, price: 300 },
-          { quantity: 5000, price: 1500 },
-          { quantity: 10000, price: 2500 },
-          { quantity: 100000, price: 6700 },
+          { 
+            name: "TikTok Likes", 
+            minOrder: 10, 
+            pricePerUnit: 0.0103, 
+            unit: "like",
+            icon: <Heart className="h-5 w-5" />
+          },
         ],
         views: [
-          { quantity: 100, price: 10 },
-          { quantity: 5000, price: 200 },
-          { quantity: 10000, price: 300 },
-          { quantity: 100000, price: 600 },
+          { 
+            name: "TikTok Video Views", 
+            minOrder: 100, 
+            pricePerUnit: 0.003528, 
+            unit: "view",
+            icon: <Eye className="h-5 w-5" />
+          },
+        ],
+        mentions: [
+          { 
+            name: "TikTok Mentions", 
+            minOrder: 50, 
+            pricePerUnit: 9, 
+            unit: "mention",
+            icon: <AtSign className="h-5 w-5" />
+          },
+        ],
+        storyViews: [
+          { 
+            name: "TikTok Story Views", 
+            minOrder: 20, 
+            pricePerUnit: 0.07267, 
+            unit: "story view",
+            icon: <Play className="h-5 w-5" />
+          },
+        ],
+        commentsLikes: [
+          { 
+            name: "TikTok Comments + Likes", 
+            minOrder: 20, 
+            pricePerUnit: 0.6, 
+            unit: "combo engagement",
+            icon: <MessageCircle className="h-5 w-5" />
+          },
         ],
       }
     },
@@ -166,6 +209,96 @@ const Services = () => {
     if (quantity >= 1000000) return `${(quantity / 1000000).toFixed(1)}M`;
     if (quantity >= 1000) return `${(quantity / 1000).toFixed(0)}K`;
     return quantity.toString();
+  };
+
+  const renderTikTokServices = () => {
+    return Object.entries(services.tiktok.services).map(([serviceKey, serviceList]) => (
+      <div key={serviceKey} className="mb-8">
+        <h3 className="text-xl font-semibold mb-4 text-gray-800 capitalize">
+          {serviceKey === 'storyViews' ? 'Story Views' : 
+           serviceKey === 'commentsLikes' ? 'Comments + Likes' : serviceKey}
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {serviceList.map((service: any, index: number) => {
+            const serviceId = `${serviceKey}-${index}`;
+            const inputValue = quantities[serviceId] || '';
+            const currentQuantity = inputValue === '' ? service.minOrder : Math.max(Number(inputValue) || service.minOrder, service.minOrder);
+            const displayValue = inputValue === '' ? '' : inputValue;
+            const totalPrice = calculateTotalPrice(service.pricePerUnit, currentQuantity);
+
+            return (
+              <Card key={index} className="overflow-hidden hover:shadow-lg transition-all duration-300 border-0 shadow-md">
+                <div className="bg-gradient-to-r from-pink-500 to-purple-600 p-4">
+                  <div className="flex items-center gap-3 text-white">
+                    {service.icon}
+                    <h4 className="font-semibold text-lg">{service.name}</h4>
+                  </div>
+                </div>
+                
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Badge variant="secondary" className="text-xs">
+                        Min: {service.minOrder} {service.unit}{service.minOrder > 1 ? 's' : ''}
+                      </Badge>
+                      <span className="text-sm font-medium text-gray-600">
+                        KSh {service.pricePerUnit.toFixed(4)} per {service.unit}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={serviceId} className="text-sm font-medium">
+                        Quantity ({service.unit}{currentQuantity > 1 ? 's' : ''})
+                      </Label>
+                      <Input
+                        id={serviceId}
+                        type="number"
+                        min={service.minOrder}
+                        step={1}
+                        value={displayValue}
+                        onChange={(e) => handleQuantityChange(serviceId, e.target.value, service.minOrder)}
+                        className="w-full"
+                        placeholder={`Min ${service.minOrder}`}
+                      />
+                      {inputValue !== '' && Number(inputValue) < service.minOrder && (
+                        <p className="text-xs text-red-500">
+                          Minimum order is {service.minOrder} {service.unit}{service.minOrder > 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border">
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600 mb-1">Total Cost</p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          KSh {totalPrice}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {currentQuantity} × KSh {service.pricePerUnit.toFixed(4)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={() => handleOrderClick({
+                        platform: "TikTok",
+                        type: service.name,
+                        quantity: currentQuantity,
+                        price: parseFloat(totalPrice),
+                      })}
+                      disabled={inputValue !== '' && Number(inputValue) < service.minOrder}
+                      className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-medium py-2 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Order Now - KSh {totalPrice}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+    ));
   };
 
   const renderInstagramServices = () => {
@@ -316,7 +449,7 @@ const Services = () => {
           <p className="text-gray-600 text-lg">Boost your social media presence with our professional services</p>
         </div>
 
-        <Tabs defaultValue="instagram" className="space-y-6">
+        <Tabs defaultValue="tiktok" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 bg-gray-100 p-1 rounded-lg">
             {Object.entries(services).map(([key, platform]) => (
               <TabsTrigger 
@@ -330,6 +463,17 @@ const Services = () => {
             ))}
           </TabsList>
 
+          <TabsContent value="tiktok" className="space-y-6">
+            <div className="bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg p-6 text-white text-center">
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <Music className="h-8 w-8" />
+                <h2 className="text-3xl font-bold">TikTok Services</h2>
+              </div>
+              <p className="text-pink-100">Professional TikTok growth solutions</p>
+            </div>
+            {renderTikTokServices()}
+          </TabsContent>
+
           <TabsContent value="instagram" className="space-y-6">
             <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg p-6 text-white text-center">
               <div className="flex items-center justify-center gap-3 mb-2">
@@ -341,7 +485,7 @@ const Services = () => {
             {renderInstagramServices()}
           </TabsContent>
 
-          {Object.entries(services).filter(([key]) => key !== 'instagram').map(([platformKey, platform]) => (
+          {Object.entries(services).filter(([key]) => key !== 'instagram' && key !== 'tiktok').map(([platformKey, platform]) => (
             <TabsContent key={platformKey} value={platformKey} className="space-y-6">
               <div className={`bg-gradient-to-r ${platform.color} rounded-lg p-6 text-white text-center`}>
                 <div className="flex items-center justify-center gap-3 mb-2">
