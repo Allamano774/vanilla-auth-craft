@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +25,37 @@ const Deposit = () => {
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("mpesa");
   const [loading, setLoading] = useState(false);
+  const [paystackLoaded, setPaystackLoaded] = useState(false);
   const { toast } = useToast();
+
+  // Load Paystack script dynamically
+  useEffect(() => {
+    const loadPaystack = () => {
+      if (window.PaystackPop) {
+        setPaystackLoaded(true);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.async = true;
+      script.onload = () => {
+        console.log('Paystack script loaded successfully');
+        setPaystackLoaded(true);
+      };
+      script.onerror = () => {
+        console.error('Failed to load Paystack script');
+        toast({
+          title: "Payment System Error",
+          description: "Failed to load payment system. Please refresh the page and try again.",
+          variant: "destructive",
+        });
+      };
+      document.head.appendChild(script);
+    };
+
+    loadPaystack();
+  }, [toast]);
 
   const paymentMethods = [
     { id: "mpesa", name: "M-Pesa (Paystack)", icon: Smartphone, description: "Pay with M-Pesa via Paystack" },
@@ -41,37 +71,46 @@ const Deposit = () => {
 
   const payWithPaystack = async (depositAmount: number): Promise<boolean> => {
     return new Promise((resolve, reject) => {
-      const ref = 'DEPOSIT_' + Date.now();
-      
       if (!window.PaystackPop) {
         reject(new Error("Paystack not loaded. Please refresh the page and try again."));
         return;
       }
 
-      console.log("Initiating Paystack payment for amount:", depositAmount);
+      if (!paystackLoaded) {
+        reject(new Error("Payment system is still loading. Please wait a moment and try again."));
+        return;
+      }
 
-      const handler = window.PaystackPop.setup({
-        key: 'pk_live_c8d72323ec70238b1fb7ce3d5a42494560fbe815', 
-        email: 'customer@example.com', // In production, use actual user email
-        amount: depositAmount * 100, // Convert to cents (Paystack expects amount in kobo/cents)
-        currency: 'KES',
-        ref: ref,
-        label: "Account Deposit",
-        callback: function(response: any) {
-          console.log("Paystack payment successful:", response);
-          toast({
-            title: "Payment Successful!",
-            description: `M-Pesa payment completed. Reference: ${response.reference}`,
-          });
-          resolve(true);
-        },
-        onClose: function() {
-          console.log("Paystack payment popup closed");
-          reject(new Error("Payment was cancelled. Please try again."));
-        }
-      });
+      const ref = 'DEPOSIT_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
       
+      console.log("Initiating Paystack payment:", {
+        amount: depositAmount,
+        amountInCents: depositAmount * 100,
+        reference: ref
+      });
+
       try {
+        const handler = window.PaystackPop.setup({
+          key: 'pk_live_c8d72323ec70238b1fb7ce3d5a42494560fbe815', 
+          email: 'customer@example.com', // In production, use actual user email
+          amount: depositAmount * 100, // Convert to cents (Paystack expects amount in kobo/cents)
+          currency: 'KES',
+          ref: ref,
+          label: "Account Deposit",
+          callback: function(response: any) {
+            console.log("Paystack payment successful:", response);
+            toast({
+              title: "Payment Successful!",
+              description: `M-Pesa payment completed. Reference: ${response.reference}`,
+            });
+            resolve(true);
+          },
+          onClose: function() {
+            console.log("Paystack payment popup closed");
+            reject(new Error("Payment was cancelled. Please try again."));
+          }
+        });
+        
         handler.openIframe();
       } catch (error) {
         console.error("Error opening Paystack iframe:", error);
@@ -109,17 +148,24 @@ const Deposit = () => {
       if (!user) throw new Error("User not authenticated");
 
       let paymentSuccess = false;
-      let paymentReference = "";
 
       // Handle M-Pesa payment via Paystack
       if (paymentMethod === "mpesa") {
+        if (!paystackLoaded) {
+          throw new Error("Payment system is still loading. Please wait a moment and try again.");
+        }
+
         try {
-          const success = await payWithPaystack(depositAmount);
-          paymentSuccess = success;
-          paymentReference = "PAYSTACK_" + Date.now();
+          paymentSuccess = await payWithPaystack(depositAmount);
         } catch (error) {
           console.error("M-Pesa payment error:", error);
-          throw error; // Re-throw the error to be handled by the outer catch block
+          const errorMessage = error instanceof Error ? error.message : "Payment failed. Please try again.";
+          toast({
+            title: "Payment Failed",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          return;
         }
       } else {
         // For other payment methods, show that they're not implemented yet
@@ -132,6 +178,8 @@ const Deposit = () => {
       }
 
       if (paymentSuccess) {
+        console.log("Processing successful payment for amount:", depositAmount);
+
         // Create deposit record
         const { error: depositError } = await supabase
           .from("deposits")
@@ -144,7 +192,7 @@ const Deposit = () => {
 
         if (depositError) {
           console.error("Error creating deposit record:", depositError);
-          throw new Error("Failed to record deposit. Please contact support.");
+          throw new Error("Failed to record deposit. Please contact support with your payment reference.");
         }
 
         // Get current balance
@@ -156,25 +204,28 @@ const Deposit = () => {
 
         if (profileError) {
           console.error("Error fetching profile:", profileError);
-          throw new Error("Failed to update balance. Please contact support.");
+          throw new Error("Failed to update balance. Please contact support with your payment reference.");
         }
 
         const currentBalance = Number(profile?.balance) || 0;
+        const newBalance = currentBalance + depositAmount;
 
         // Update user balance
         const { error: balanceError } = await supabase
           .from("profiles")
-          .update({ balance: currentBalance + depositAmount })
+          .update({ balance: newBalance })
           .eq("id", user.id);
 
         if (balanceError) {
           console.error("Error updating balance:", balanceError);
-          throw new Error("Failed to update balance. Please contact support.");
+          throw new Error("Failed to update balance. Please contact support with your payment reference.");
         }
+
+        console.log("Balance updated successfully:", { oldBalance: currentBalance, newBalance });
 
         toast({
           title: "Deposit Successful!",
-          description: `$${depositAmount.toFixed(2)} has been added to your account.`,
+          description: `$${depositAmount.toFixed(2)} has been added to your account. New balance: $${newBalance.toFixed(2)}`,
         });
 
         setAmount("");
@@ -257,14 +308,24 @@ const Deposit = () => {
                 </RadioGroup>
               </div>
 
+              {paymentMethod === "mpesa" && !paystackLoaded && (
+                <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+                  <i className="fas fa-spinner fa-spin mr-2"></i>
+                  Loading payment system...
+                </div>
+              )}
+
               <div className="pt-4">
                 <Button
                   type="submit"
-                  disabled={loading || !amount}
+                  disabled={loading || !amount || (paymentMethod === "mpesa" && !paystackLoaded)}
                   className="w-full"
                   size="lg"
                 >
-                  {loading ? "Processing..." : paymentMethod === "mpesa" ? `Pay KES ${(parseFloat(amount || "0") * 100).toFixed(0)} via M-Pesa` : `Deposit $${amount || "0.00"}`}
+                  {loading ? "Processing..." : 
+                   paymentMethod === "mpesa" ? 
+                   `Pay KES ${(parseFloat(amount || "0") * 100).toFixed(0)} via M-Pesa` : 
+                   `Deposit $${amount || "0.00"}`}
                 </Button>
               </div>
             </form>
@@ -282,12 +343,10 @@ const Deposit = () => {
             <p>• Deposits are usually processed instantly</p>
             <p>• All payments are secure and encrypted</p>
             <p>• Contact support if you encounter any issues</p>
+            <p>• Keep your payment reference for support inquiries</p>
           </CardContent>
         </Card>
       </div>
-
-      {/* Load Paystack Script */}
-      <script src="https://js.paystack.co/v1/inline.js"></script>
     </DashboardLayout>
   );
 };
