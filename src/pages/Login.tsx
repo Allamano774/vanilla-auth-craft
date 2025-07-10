@@ -1,8 +1,9 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, ArrowLeft, CheckCircle, AlertCircle } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff, Mail, Lock, ArrowLeft, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LoginFormData {
   email: string;
@@ -23,6 +24,7 @@ const Login = () => {
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,7 +57,6 @@ const Login = () => {
       [name]: value
     }));
     
-    // Clear error when user starts typing
     if (errors[name as keyof LoginErrors]) {
       setErrors(prev => ({
         ...prev,
@@ -78,21 +79,25 @@ const Login = () => {
 
     setIsLoading(true);
     
-    // Simulate API call
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      toast({
-        title: "Success!",
-        description: "Login successful. Welcome back!",
-        variant: "default",
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
       });
-      
-      console.log("Login successful:", formData);
-    } catch (error) {
+
+      if (error) throw error;
+
+      if (data.user) {
+        toast({
+          title: "Success!",
+          description: "Login successful. Welcome back!",
+        });
+        navigate("/dashboard");
+      }
+    } catch (error: any) {
       toast({
         title: "Login Failed",
-        description: "Invalid credentials. Please try again.",
+        description: error.message || "Invalid credentials. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -103,7 +108,6 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-800 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        {/* Back Button */}
         <Link
           to="/"
           className="inline-flex items-center text-white/80 hover:text-white mb-6 transition-colors group"
@@ -112,9 +116,7 @@ const Login = () => {
           Back to Home
         </Link>
 
-        {/* Login Form Card */}
         <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-8 shadow-2xl">
-          {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full mb-4">
               <Lock className="w-8 h-8 text-white" />
@@ -123,9 +125,7 @@ const Login = () => {
             <p className="text-white/70">Sign in to your account</p>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
             <div>
               <label className="block text-white font-medium mb-2">
                 Email Address
@@ -154,7 +154,6 @@ const Login = () => {
               )}
             </div>
 
-            {/* Password Field */}
             <div>
               <label className="block text-white font-medium mb-2">
                 Password
@@ -185,7 +184,6 @@ const Login = () => {
               )}
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -202,7 +200,6 @@ const Login = () => {
             </button>
           </form>
 
-          {/* Footer */}
           <div className="text-center mt-6">
             <p className="text-white/70">
               Don't have an account?{" "}

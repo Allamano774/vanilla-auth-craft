@@ -1,8 +1,8 @@
-
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, CheckCircle, AlertCircle } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface RegisterFormData {
   fullName: string;
@@ -30,6 +30,7 @@ const Register = () => {
   const [errors, setErrors] = useState<RegisterErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -101,21 +102,31 @@ const Register = () => {
 
     setIsLoading(true);
     
-    // Simulate API call
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      toast({
-        title: "Account Created!",
-        description: "Welcome! Your account has been successfully created.",
-        variant: "default",
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+          },
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+        },
       });
-      
-      console.log("Registration successful:", formData);
-    } catch (error) {
+
+      if (error) throw error;
+
+      if (data.user) {
+        toast({
+          title: "Account Created!",
+          description: "Welcome! Your account has been successfully created.",
+        });
+        navigate("/dashboard");
+      }
+    } catch (error: any) {
       toast({
         title: "Registration Failed",
-        description: "Something went wrong. Please try again.",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
