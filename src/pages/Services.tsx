@@ -134,7 +134,7 @@ const Services = () => {
                                 {formatQuantity(service.quantity)} {serviceType}
                               </p>
                               <p className="text-2xl font-bold text-blue-600">
-                                ${service.price}
+                                KSh {service.price}
                               </p>
                             </div>
                           </div>

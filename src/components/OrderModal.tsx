@@ -55,7 +55,7 @@ const OrderModal = ({ isOpen, onClose, service }: OrderModalProps) => {
     if (userBalance < service.price) {
       toast({
         title: "Insufficient Balance",
-        description: `You need $${service.price.toFixed(2)} but only have $${userBalance.toFixed(2)}. Please add funds to your account.`,
+        description: `You need KSh ${service.price.toFixed(2)} but only have KSh ${userBalance.toFixed(2)}. Please add funds to your account.`,
         variant: "destructive",
       });
       return;
@@ -124,7 +124,7 @@ const OrderModal = ({ isOpen, onClose, service }: OrderModalProps) => {
             <Label>Service Details</Label>
             <div className="p-3 bg-gray-50 rounded-lg">
               <p className="font-medium">{service.quantity} {service.platform} {service.type}</p>
-              <p className="text-lg font-bold text-blue-600">${service.price}</p>
+              <p className="text-lg font-bold text-blue-600">KSh {service.price}</p>
             </div>
           </div>
 
@@ -132,11 +132,11 @@ const OrderModal = ({ isOpen, onClose, service }: OrderModalProps) => {
             <Label>Account Balance</Label>
             <div className={`p-3 rounded-lg ${canAfford ? 'bg-green-50' : 'bg-red-50'}`}>
               <p className={`font-medium ${canAfford ? 'text-green-700' : 'text-red-700'}`}>
-                ${userBalance.toFixed(2)}
+                KSh {userBalance.toFixed(2)}
               </p>
               {!canAfford && (
                 <p className="text-sm text-red-600 mt-1">
-                  Insufficient funds. Need ${(service.price - userBalance).toFixed(2)} more.
+                  Insufficient funds. Need KSh {(service.price - userBalance).toFixed(2)} more.
                 </p>
               )}
             </div>
@@ -168,7 +168,7 @@ const OrderModal = ({ isOpen, onClose, service }: OrderModalProps) => {
               disabled={loading || !canAfford}
               className="flex-1"
             >
-              {loading ? "Processing..." : `Place Order - $${service.price}`}
+              {loading ? "Processing..." : `Place Order - KSh ${service.price}`}
             </Button>
           </div>
         </form>

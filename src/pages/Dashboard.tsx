@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, ShoppingCart, Package, TrendingUp } from "lucide-react";
@@ -56,7 +55,7 @@ const Dashboard = () => {
   const statCards = [
     {
       title: "Account Balance",
-      value: `$${stats.balance.toFixed(2)}`,
+      value: `KSh ${stats.balance.toFixed(2)}`,
       icon: DollarSign,
       color: "text-green-600",
       bgColor: "bg-green-50",
@@ -77,7 +76,7 @@ const Dashboard = () => {
     },
     {
       title: "Total Spent",
-      value: `$${stats.totalSpent.toFixed(2)}`,
+      value: `KSh ${stats.totalSpent.toFixed(2)}`,
       icon: TrendingUp,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
