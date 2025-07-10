@@ -11,6 +11,7 @@ import OrderModal from "@/components/OrderModal";
 const Services = () => {
   const [selectedService, setSelectedService] = useState<any>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [quantities, setQuantities] = useState<{[key: string]: number}>({});
 
   const services = {
     tiktok: {
@@ -43,19 +44,26 @@ const Services = () => {
       name: "Instagram",
       icon: "📸",
       services: {
+        verification: [
+          { name: "Instagram Verification (Blue Tick)", minOrder: 1, unitPrice: 1700, unit: "verification" },
+        ],
         followers: [
-          { quantity: 100, price: 40 },
-          { quantity: 200, price: 80 },
-          { quantity: 300, price: 130 },
-          { quantity: 500, price: 200 },
-          { quantity: 1000, price: 400 },
+          { name: "Instagram Followers", minOrder: 10, unitPrice: 3, unit: "10 followers" },
         ],
         likes: [
-          { quantity: 100, price: 35 },
-          { quantity: 1000, price: 300 },
-          { quantity: 5000, price: 1500 },
-          { quantity: 10000, price: 2500 },
-          { quantity: 100000, price: 6700 },
+          { name: "Instagram Likes", minOrder: 10, unitPrice: 0.103, unit: "10 likes" },
+        ],
+        views: [
+          { name: "Instagram Video Views", minOrder: 100, unitPrice: 0.3528, unit: "100 views" },
+        ],
+        mentions: [
+          { name: "Instagram Mentions", minOrder: 50, unitPrice: 450, unit: "50 mentions" },
+        ],
+        storyViews: [
+          { name: "Instagram Story Views", minOrder: 20, unitPrice: 1.4534, unit: "20 story views" },
+        ],
+        commentsLikes: [
+          { name: "Instagram Comments + Likes", minOrder: 20, unitPrice: 12, unit: "20 combo engagements" },
         ],
       }
     },
@@ -88,10 +96,139 @@ const Services = () => {
     setIsOrderModalOpen(true);
   };
 
+  const handleQuantityChange = (serviceKey: string, value: number, minOrder: number) => {
+    if (value >= minOrder) {
+      setQuantities(prev => ({ ...prev, [serviceKey]: value }));
+    }
+  };
+
+  const calculateTotalPrice = (unitPrice: number, quantity: number) => {
+    return (unitPrice * quantity).toFixed(2);
+  };
+
   const formatQuantity = (quantity: number) => {
     if (quantity >= 1000000) return `${(quantity / 1000000).toFixed(1)}M`;
     if (quantity >= 1000) return `${(quantity / 1000).toFixed(0)}K`;
     return quantity.toString();
+  };
+
+  const renderInstagramServices = () => {
+    return Object.entries(services.instagram.services).map(([serviceKey, serviceList]) => (
+      <Card key={serviceKey} className="mb-6">
+        <CardHeader>
+          <CardTitle className="capitalize">
+            {serviceKey === 'storyViews' ? 'Story Views' : 
+             serviceKey === 'commentsLikes' ? 'Comments + Likes' : serviceKey}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {serviceList.map((service: any, index: number) => {
+              const serviceId = `${serviceKey}-${index}`;
+              const currentQuantity = quantities[serviceId] || service.minOrder;
+              const totalPrice = calculateTotalPrice(service.unitPrice, currentQuantity);
+
+              return (
+                <div
+                  key={index}
+                  className="border rounded-lg p-4 hover:shadow-md transition-shadow"
+                >
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-semibold text-lg mb-2">{service.name}</h3>
+                      <p className="text-sm text-gray-600 mb-1">
+                        Minimum Order: {service.minOrder} {service.unit}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Price: KSh {service.unitPrice} per {service.unit}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={serviceId}>Quantity</Label>
+                      <Input
+                        id={serviceId}
+                        type="number"
+                        min={service.minOrder}
+                        value={currentQuantity}
+                        onChange={(e) => handleQuantityChange(serviceId, parseInt(e.target.value) || service.minOrder, service.minOrder)}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Minimum: {service.minOrder}
+                      </p>
+                    </div>
+
+                    <div className="bg-blue-50 rounded-lg p-3">
+                      <p className="text-sm text-gray-600">Total Cost:</p>
+                      <p className="text-2xl font-bold text-blue-600">
+                        KSh {totalPrice}
+                      </p>
+                    </div>
+
+                    <Button
+                      onClick={() => handleOrderClick({
+                        platform: "Instagram",
+                        type: service.name,
+                        quantity: currentQuantity,
+                        price: parseFloat(totalPrice),
+                      })}
+                      className="w-full"
+                    >
+                      Order Now
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    ));
+  };
+
+  const renderOtherPlatformServices = (platformKey: string, platform: any) => {
+    return Object.entries(platform.services).map(([serviceType, serviceList]: [string, any]) => (
+      <Card key={serviceType}>
+        <CardHeader>
+          <CardTitle className="capitalize">
+            {platform.name} {serviceType}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {serviceList.map((service: any, index: number) => (
+              <div
+                key={index}
+                className="border rounded-lg p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <p className="font-semibold text-lg">
+                      {formatQuantity(service.quantity)} {serviceType}
+                    </p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      KSh {service.price}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => handleOrderClick({
+                    platform: platform.name,
+                    type: serviceType,
+                    quantity: service.quantity,
+                    price: service.price,
+                  })}
+                  className="w-full"
+                >
+                  Order Now
+                </Button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    ));
   };
 
   return (
@@ -112,49 +249,13 @@ const Services = () => {
             ))}
           </TabsList>
 
-          {Object.entries(services).map(([platformKey, platform]) => (
+          <TabsContent value="instagram" className="space-y-6">
+            {renderInstagramServices()}
+          </TabsContent>
+
+          {Object.entries(services).filter(([key]) => key !== 'instagram').map(([platformKey, platform]) => (
             <TabsContent key={platformKey} value={platformKey} className="space-y-6">
-              {Object.entries(platform.services).map(([serviceType, serviceList]) => (
-                <Card key={serviceType}>
-                  <CardHeader>
-                    <CardTitle className="capitalize">
-                      {platform.name} {serviceType}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {serviceList.map((service, index) => (
-                        <div
-                          key={index}
-                          className="border rounded-lg p-4 hover:shadow-md transition-shadow"
-                        >
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <p className="font-semibold text-lg">
-                                {formatQuantity(service.quantity)} {serviceType}
-                              </p>
-                              <p className="text-2xl font-bold text-blue-600">
-                                KSh {service.price}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            onClick={() => handleOrderClick({
-                              platform: platform.name,
-                              type: serviceType,
-                              quantity: service.quantity,
-                              price: service.price,
-                            })}
-                            className="w-full"
-                          >
-                            Order Now
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {renderOtherPlatformServices(platformKey, platform)}
             </TabsContent>
           ))}
         </Tabs>
