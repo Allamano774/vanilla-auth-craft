@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -154,13 +153,30 @@ const Deposit = () => {
           currency: 'KES',
           ref: transactionRef,
           label: "Account Deposit",
-          callback: function(response: any) {
+          callback: async function(response: any) {
             console.log("Paystack payment successful:", response);
-            toast({
-              title: "Payment Successful!",
-              description: `M-Pesa payment completed. Reference: ${response.reference}`,
-            });
-            resolve(true);
+            
+            // Immediately update deposit status to completed
+            try {
+              console.log("Updating deposit status to completed for ID:", depositId);
+              await updateDepositStatus(depositId, "completed");
+              console.log("Deposit status successfully updated to completed");
+              
+              toast({
+                title: "Payment Successful!",
+                description: `M-Pesa payment completed. Reference: ${response.reference}`,
+              });
+              
+              resolve(true);
+            } catch (error) {
+              console.error("Error updating deposit status after successful payment:", error);
+              // Still resolve as true since payment was successful
+              toast({
+                title: "Payment Successful!",
+                description: `M-Pesa payment completed. Reference: ${response.reference}. Status update pending.`,
+              });
+              resolve(true);
+            }
           },
           onClose: function() {
             console.log("Paystack payment popup closed - marking as cancelled with reference:", transactionRef);
@@ -182,6 +198,7 @@ const Deposit = () => {
 
   const updateDepositStatus = async (depositId: string, status: string) => {
     try {
+      console.log(`Attempting to update deposit ${depositId} status to: ${status}`);
       const { error } = await supabase
         .from("deposits")
         .update({ status })
@@ -189,13 +206,15 @@ const Deposit = () => {
 
       if (error) {
         console.error("Error updating deposit status:", error);
+        throw error;
       } else {
-        console.log(`Deposit ${depositId} status updated to: ${status}`);
-        // Refresh deposits list to show updated status
+        console.log(`Deposit ${depositId} status successfully updated to: ${status}`);
+        // Refresh deposits list to show updated status immediately
         await fetchDeposits();
       }
     } catch (error) {
       console.error("Error updating deposit status:", error);
+      throw error;
     }
   };
 
@@ -289,9 +308,6 @@ const Deposit = () => {
 
       if (paymentSuccess) {
         console.log("Processing successful payment for amount:", depositAmount);
-
-        // Update deposit status to completed
-        await updateDepositStatus(depositId, "completed");
 
         // Get current balance
         const { data: profile, error: profileError } = await supabase
