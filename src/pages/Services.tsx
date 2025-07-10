@@ -45,25 +45,25 @@ const Services = () => {
       icon: "📸",
       services: {
         verification: [
-          { name: "Instagram Verification (Blue Tick)", minOrder: 1, unitPrice: 1700, unit: "verification" },
+          { name: "Instagram Verification (Blue Tick)", minOrder: 1, pricePerUnit: 1700, unit: "verification" },
         ],
         followers: [
-          { name: "Instagram Followers", minOrder: 10, unitPrice: 3, unit: "10 followers" },
+          { name: "Instagram Followers", minOrder: 10, pricePerUnit: 0.3, unit: "follower" },
         ],
         likes: [
-          { name: "Instagram Likes", minOrder: 10, unitPrice: 0.103, unit: "10 likes" },
+          { name: "Instagram Likes", minOrder: 10, pricePerUnit: 0.0103, unit: "like" },
         ],
         views: [
-          { name: "Instagram Video Views", minOrder: 100, unitPrice: 0.3528, unit: "100 views" },
+          { name: "Instagram Video Views", minOrder: 100, pricePerUnit: 0.003528, unit: "view" },
         ],
         mentions: [
-          { name: "Instagram Mentions", minOrder: 50, unitPrice: 450, unit: "50 mentions" },
+          { name: "Instagram Mentions", minOrder: 50, pricePerUnit: 9, unit: "mention" },
         ],
         storyViews: [
-          { name: "Instagram Story Views", minOrder: 20, unitPrice: 1.4534, unit: "20 story views" },
+          { name: "Instagram Story Views", minOrder: 20, pricePerUnit: 0.07267, unit: "story view" },
         ],
         commentsLikes: [
-          { name: "Instagram Comments + Likes", minOrder: 20, unitPrice: 12, unit: "20 combo engagements" },
+          { name: "Instagram Comments + Likes", minOrder: 20, pricePerUnit: 0.6, unit: "combo engagement" },
         ],
       }
     },
@@ -102,8 +102,8 @@ const Services = () => {
     }
   };
 
-  const calculateTotalPrice = (unitPrice: number, quantity: number) => {
-    return (unitPrice * quantity).toFixed(2);
+  const calculateTotalPrice = (pricePerUnit: number, quantity: number) => {
+    return (pricePerUnit * quantity).toFixed(4);
   };
 
   const formatQuantity = (quantity: number) => {
@@ -126,7 +126,7 @@ const Services = () => {
             {serviceList.map((service: any, index: number) => {
               const serviceId = `${serviceKey}-${index}`;
               const currentQuantity = quantities[serviceId] || service.minOrder;
-              const totalPrice = calculateTotalPrice(service.unitPrice, currentQuantity);
+              const totalPrice = calculateTotalPrice(service.pricePerUnit, currentQuantity);
 
               return (
                 <div
@@ -137,25 +137,27 @@ const Services = () => {
                     <div>
                       <h3 className="font-semibold text-lg mb-2">{service.name}</h3>
                       <p className="text-sm text-gray-600 mb-1">
-                        Minimum Order: {service.minOrder} {service.unit}
+                        Minimum Order: {service.minOrder} {service.unit}{service.minOrder > 1 ? 's' : ''}
                       </p>
                       <p className="text-sm text-gray-600">
-                        Price: KSh {service.unitPrice} per {service.unit}
+                        Price: KSh {service.pricePerUnit} per {service.unit}
                       </p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor={serviceId}>Quantity</Label>
+                      <Label htmlFor={serviceId}>Quantity ({service.unit}{currentQuantity > 1 ? 's' : ''})</Label>
                       <Input
                         id={serviceId}
                         type="number"
                         min={service.minOrder}
+                        step={1}
                         value={currentQuantity}
                         onChange={(e) => handleQuantityChange(serviceId, parseInt(e.target.value) || service.minOrder, service.minOrder)}
                         className="w-full"
+                        placeholder={`Enter minimum ${service.minOrder}`}
                       />
                       <p className="text-xs text-gray-500">
-                        Minimum: {service.minOrder}
+                        Minimum: {service.minOrder} {service.unit}{service.minOrder > 1 ? 's' : ''}
                       </p>
                     </div>
 
@@ -163,6 +165,9 @@ const Services = () => {
                       <p className="text-sm text-gray-600">Total Cost:</p>
                       <p className="text-2xl font-bold text-blue-600">
                         KSh {totalPrice}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {currentQuantity} × KSh {service.pricePerUnit} = KSh {totalPrice}
                       </p>
                     </div>
 
@@ -175,7 +180,7 @@ const Services = () => {
                       })}
                       className="w-full"
                     >
-                      Order Now
+                      Order Now - KSh {totalPrice}
                     </Button>
                   </div>
                 </div>
