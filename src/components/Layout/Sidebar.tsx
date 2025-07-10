@@ -72,7 +72,7 @@ const Sidebar = () => {
         } lg:translate-x-0`}
       >
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-8">SocialBoost</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-8">NeuroTechGains</h2>
         </div>
 
         <nav className="px-4">

@@ -63,7 +63,7 @@ const Deposit = () => {
     { id: "card", name: "Credit/Debit Card", icon: CreditCard, description: "Visa, MasterCard (Coming Soon)" },
   ];
 
-  const quickAmounts = [10, 25, 50, 100, 250, 500];
+  const quickAmounts = [100, 250, 500, 1000, 2500, 5000];
 
   const handleQuickAmount = (value: number) => {
     setAmount(value.toString());
@@ -92,7 +92,7 @@ const Deposit = () => {
       try {
         const handler = window.PaystackPop.setup({
           key: 'pk_live_c8d72323ec70238b1fb7ce3d5a42494560fbe815', 
-          email: 'customer@example.com', // In production, use actual user email
+          email: 'customer@example.com',
           amount: depositAmount * 100, // Convert to cents (Paystack expects amount in kobo/cents)
           currency: 'KES',
           ref: ref,
@@ -132,10 +132,10 @@ const Deposit = () => {
       return;
     }
 
-    if (depositAmount < 5) {
+    if (depositAmount < 50) {
       toast({
         title: "Minimum Deposit",
-        description: "Minimum deposit amount is $5.",
+        description: "Minimum deposit amount is KES 50.",
         variant: "destructive",
       });
       return;
@@ -225,7 +225,7 @@ const Deposit = () => {
 
         toast({
           title: "Deposit Successful!",
-          description: `$${depositAmount.toFixed(2)} has been added to your account. New balance: $${newBalance.toFixed(2)}`,
+          description: `KES ${depositAmount.toFixed(2)} has been added to your account. New balance: KES ${newBalance.toFixed(2)}`,
         });
 
         setAmount("");
@@ -261,14 +261,14 @@ const Deposit = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-3">
-                <Label htmlFor="amount">Enter Amount ($)</Label>
+                <Label htmlFor="amount">Enter Amount (KES)</Label>
                 <Input
                   id="amount"
                   type="number"
                   placeholder="0.00"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  min="5"
+                  min="50"
                   step="0.01"
                   required
                 />
@@ -282,7 +282,7 @@ const Deposit = () => {
                       onClick={() => handleQuickAmount(value)}
                       className="text-sm"
                     >
-                      ${value}
+                      KES {value}
                     </Button>
                   ))}
                 </div>
@@ -324,8 +324,8 @@ const Deposit = () => {
                 >
                   {loading ? "Processing..." : 
                    paymentMethod === "mpesa" ? 
-                   `Pay KES ${(parseFloat(amount || "0") * 100).toFixed(0)} via M-Pesa` : 
-                   `Deposit $${amount || "0.00"}`}
+                   `Pay KES ${(parseFloat(amount || "0")).toFixed(0)} via M-Pesa` : 
+                   `Deposit KES ${amount || "0.00"}`}
                 </Button>
               </div>
             </form>
@@ -337,7 +337,7 @@ const Deposit = () => {
             <CardTitle>Important Notes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-gray-600">
-            <p>• Minimum deposit amount is $5</p>
+            <p>• Minimum deposit amount is KES 50</p>
             <p>• M-Pesa payments are processed via Paystack</p>
             <p>• Only M-Pesa is currently available - other methods coming soon</p>
             <p>• Deposits are usually processed instantly</p>
