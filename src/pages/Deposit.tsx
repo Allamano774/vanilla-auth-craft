@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CreditCard, Smartphone, DollarSign, History } from "lucide-react";
+import { CreditCard, Smartphone, DollarSign, History, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
@@ -29,6 +29,7 @@ const Deposit = () => {
   const [paystackLoaded, setPaystackLoaded] = useState(false);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [loadingDeposits, setLoadingDeposits] = useState(true);
+  const [autoRefreshing, setAutoRefreshing] = useState(false);
   const { toast } = useToast();
 
   // Load Paystack script dynamically
@@ -61,33 +62,58 @@ const Deposit = () => {
   }, [toast]);
 
   // Fetch user's deposit history
-  useEffect(() => {
-    const fetchDeposits = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+  const fetchDeposits = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-        const { data, error } = await supabase
-          .from("deposits")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("deposits")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
 
-        if (error) {
-          console.error("Error fetching deposits:", error);
-          return;
-        }
-
-        setDeposits(data || []);
-      } catch (error) {
+      if (error) {
         console.error("Error fetching deposits:", error);
-      } finally {
-        setLoadingDeposits(false);
+        return;
       }
-    };
 
+      setDeposits(data || []);
+    } catch (error) {
+      console.error("Error fetching deposits:", error);
+    } finally {
+      setLoadingDeposits(false);
+    }
+  };
+
+  // Initial fetch
+  useEffect(() => {
     fetchDeposits();
   }, []);
+
+  // Auto-refresh deposits every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log("Auto-refreshing deposits...");
+      setAutoRefreshing(true);
+      fetchDeposits().then(() => {
+        setAutoRefreshing(false);
+      });
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Manual refresh function
+  const handleRefreshDeposits = async () => {
+    setAutoRefreshing(true);
+    await fetchDeposits();
+    setAutoRefreshing(false);
+    toast({
+      title: "Deposits Refreshed",
+      description: "Your deposit history has been updated.",
+    });
+  };
 
   const paymentMethods = [
     { id: "mpesa", name: "M-Pesa (Paystack)", icon: Smartphone, description: "Pay with M-Pesa via Paystack" },
@@ -262,16 +288,8 @@ const Deposit = () => {
 
         setAmount("");
         
-        // Refresh deposits list
-        const { data: updatedDeposits } = await supabase
-          .from("deposits")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-        
-        if (updatedDeposits) {
-          setDeposits(updatedDeposits);
-        }
+        // Refresh deposits list immediately
+        await fetchDeposits();
       }
     } catch (error) {
       console.error("Error processing deposit:", error);
@@ -403,12 +421,31 @@ const Deposit = () => {
           {/* Deposit History */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="w-5 h-5" />
-                Deposit History
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  Deposit History
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefreshDeposits}
+                  disabled={autoRefreshing}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className={`w-4 h-4 ${autoRefreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {autoRefreshing && (
+                <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded-lg mb-4 flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Checking for new transactions...
+                </div>
+              )}
+              
               {loadingDeposits ? (
                 <div className="text-center py-4">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
@@ -463,6 +500,7 @@ const Deposit = () => {
             <p>• M-Pesa payments are processed via Paystack</p>
             <p>• Only M-Pesa is currently available - other methods coming soon</p>
             <p>• Deposits are usually processed instantly</p>
+            <p>• Transactions are automatically checked every 30 seconds</p>
             <p>• All payments are secure and encrypted</p>
             <p>• Contact support if you encounter any issues</p>
             <p>• Keep your payment reference for support inquiries</p>
