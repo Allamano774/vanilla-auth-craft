@@ -145,40 +145,6 @@ const Deposit = () => {
         depositId
       });
 
-      // Define callback function separately to ensure it's a proper function
-      const handleSuccess = async (response: any) => {
-        console.log("Paystack payment successful:", response);
-        
-        // Immediately update deposit status to completed
-        try {
-          console.log("Updating deposit status to completed for ID:", depositId);
-          await updateDepositStatus(depositId, "completed");
-          console.log("Deposit status successfully updated to completed");
-          
-          toast({
-            title: "Payment Successful!",
-            description: `M-Pesa payment completed. Reference: ${response.reference}`,
-          });
-          
-          resolve(true);
-        } catch (error) {
-          console.error("Error updating deposit status after successful payment:", error);
-          // Still resolve as true since payment was successful
-          toast({
-            title: "Payment Successful!",
-            description: `M-Pesa payment completed. Reference: ${response.reference}. Status update pending.`,
-          });
-          resolve(true);
-        }
-      };
-
-      const handleClose = () => {
-        console.log("Paystack payment popup closed - marking as cancelled with reference:", transactionRef);
-        // Update the deposit status to cancelled when popup is closed
-        updateDepositStatus(depositId, "cancelled");
-        reject(new Error(`Payment was cancelled. Transaction reference: ${transactionRef}`));
-      };
-
       try {
         const handler = window.PaystackPop.setup({
           key: 'pk_live_c8d72323ec70238b1fb7ce3d5a42494560fbe815', 
@@ -187,8 +153,35 @@ const Deposit = () => {
           currency: 'KES',
           ref: transactionRef,
           label: "Account Deposit",
-          callback: handleSuccess,
-          onClose: handleClose
+          callback: function(response: any) {
+            console.log("Paystack payment successful:", response);
+            
+            // Immediately update deposit status to completed
+            updateDepositStatus(depositId, "completed").then(() => {
+              console.log("Deposit status successfully updated to completed");
+              
+              toast({
+                title: "Payment Successful!",
+                description: `M-Pesa payment completed. Reference: ${response.reference}`,
+              });
+              
+              resolve(true);
+            }).catch((error) => {
+              console.error("Error updating deposit status after successful payment:", error);
+              // Still resolve as true since payment was successful
+              toast({
+                title: "Payment Successful!",
+                description: `M-Pesa payment completed. Reference: ${response.reference}. Status update pending.`,
+              });
+              resolve(true);
+            });
+          },
+          onClose: function() {
+            console.log("Paystack payment popup closed - marking as cancelled with reference:", transactionRef);
+            // Update the deposit status to cancelled when popup is closed
+            updateDepositStatus(depositId, "cancelled");
+            reject(new Error(`Payment was cancelled. Transaction reference: ${transactionRef}`));
+          }
         });
         
         handler.openIframe();
