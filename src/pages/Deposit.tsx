@@ -10,6 +10,17 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 
+// Declare PaystackPop for TypeScript
+declare global {
+  interface Window {
+    PaystackPop: {
+      setup: (config: any) => {
+        openIframe: () => void;
+      };
+    };
+  }
+}
+
 const Deposit = () => {
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("mpesa");
@@ -17,7 +28,7 @@ const Deposit = () => {
   const { toast } = useToast();
 
   const paymentMethods = [
-    { id: "mpesa", name: "M-Pesa", icon: Smartphone, description: "Mobile money transfer" },
+    { id: "mpesa", name: "M-Pesa (Paystack)", icon: Smartphone, description: "Pay with M-Pesa via Paystack" },
     { id: "paypal", name: "PayPal", icon: CreditCard, description: "International payments" },
     { id: "card", name: "Credit/Debit Card", icon: CreditCard, description: "Visa, MasterCard" },
   ];
@@ -26,6 +37,34 @@ const Deposit = () => {
 
   const handleQuickAmount = (value: number) => {
     setAmount(value.toString());
+  };
+
+  const payWithPaystack = async (depositAmount: number) => {
+    return new Promise((resolve, reject) => {
+      const ref = 'DEPOSIT_' + Date.now();
+      
+      if (!window.PaystackPop) {
+        reject(new Error("Paystack not loaded"));
+        return;
+      }
+
+      const handler = window.PaystackPop.setup({
+        key: 'pk_live_c8d72323ec70238b1fb7ce3d5a42494560fbe815', 
+        email: 'customer@example.com', // In production, use actual user email
+        amount: depositAmount * 100, // Convert to cents (Paystack expects amount in kobo/cents)
+        currency: 'KES',
+        ref: ref,
+        label: "Account Deposit",
+        callback: function(response: any) {
+          resolve(response);
+        },
+        onClose: function() {
+          reject(new Error("Payment was cancelled"));
+        }
+      });
+      
+      handler.openIframe();
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,46 +95,71 @@ const Deposit = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
-      // Create deposit record
-      const { error: depositError } = await supabase
-        .from("deposits")
-        .insert({
-          user_id: user.id,
-          amount: depositAmount,
-          payment_method: paymentMethod,
-          status: "completed", // Mock success for demo
+      let paymentSuccess = false;
+      let paymentReference = "";
+
+      // Handle M-Pesa payment via Paystack
+      if (paymentMethod === "mpesa") {
+        try {
+          const response = await payWithPaystack(depositAmount);
+          paymentSuccess = true;
+          paymentReference = (response as any).reference;
+          
+          toast({
+            title: "Payment Successful!",
+            description: `M-Pesa payment completed. Reference: ${paymentReference}`,
+          });
+        } catch (error) {
+          throw new Error("M-Pesa payment failed or was cancelled");
+        }
+      } else {
+        // Mock success for other payment methods
+        paymentSuccess = true;
+        paymentReference = "MOCK_" + Date.now();
+      }
+
+      if (paymentSuccess) {
+        // Create deposit record
+        const { error: depositError } = await supabase
+          .from("deposits")
+          .insert({
+            user_id: user.id,
+            amount: depositAmount,
+            payment_method: paymentMethod,
+            status: "completed",
+          });
+
+        if (depositError) throw depositError;
+
+        // Get current balance
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("balance")
+          .eq("id", user.id)
+          .single();
+
+        const currentBalance = Number(profile?.balance) || 0;
+
+        // Update user balance
+        const { error: balanceError } = await supabase
+          .from("profiles")
+          .update({ balance: currentBalance + depositAmount })
+          .eq("id", user.id);
+
+        if (balanceError) throw balanceError;
+
+        toast({
+          title: "Deposit Successful!",
+          description: `$${depositAmount.toFixed(2)} has been added to your account.`,
         });
 
-      if (depositError) throw depositError;
-
-      // Get current balance
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("balance")
-        .eq("id", user.id)
-        .single();
-
-      const currentBalance = Number(profile?.balance) || 0;
-
-      // Update user balance
-      const { error: balanceError } = await supabase
-        .from("profiles")
-        .update({ balance: currentBalance + depositAmount })
-        .eq("id", user.id);
-
-      if (balanceError) throw balanceError;
-
-      toast({
-        title: "Deposit Successful!",
-        description: `$${depositAmount.toFixed(2)} has been added to your account.`,
-      });
-
-      setAmount("");
+        setAmount("");
+      }
     } catch (error) {
       console.error("Error processing deposit:", error);
       toast({
         title: "Deposit Failed",
-        description: "There was an error processing your deposit. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error processing your deposit. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -175,7 +239,7 @@ const Deposit = () => {
                   className="w-full"
                   size="lg"
                 >
-                  {loading ? "Processing..." : `Deposit $${amount || "0.00"}`}
+                  {loading ? "Processing..." : paymentMethod === "mpesa" ? `Pay KES ${(parseFloat(amount || "0") * 100).toFixed(0)} via M-Pesa` : `Deposit $${amount || "0.00"}`}
                 </Button>
               </div>
             </form>
@@ -188,12 +252,16 @@ const Deposit = () => {
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-gray-600">
             <p>• Minimum deposit amount is $5</p>
+            <p>• M-Pesa payments are processed via Paystack</p>
             <p>• Deposits are usually processed instantly</p>
             <p>• All payments are secure and encrypted</p>
             <p>• Contact support if you encounter any issues</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Load Paystack Script */}
+      <script src="https://js.paystack.co/v1/inline.js"></script>
     </DashboardLayout>
   );
 };
