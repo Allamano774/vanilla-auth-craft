@@ -9,7 +9,8 @@ import {
   User, 
   LogOut,
   Menu,
-  X
+  X,
+  HelpCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +44,7 @@ const Sidebar = () => {
     { path: "/deposit", icon: CreditCard, label: "Deposit" },
     { path: "/orders", icon: ShoppingCart, label: "Orders" },
     { path: "/profile", icon: User, label: "Profile" },
+    { path: "/support", icon: HelpCircle, label: "Support" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
