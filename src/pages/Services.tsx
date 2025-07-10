@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,7 +12,7 @@ import OrderModal from "@/components/OrderModal";
 const Services = () => {
   const [selectedService, setSelectedService] = useState<any>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [quantities, setQuantities] = useState<{[key: string]: number}>({});
+  const [quantities, setQuantities] = useState<{[key: string]: string}>({});
 
   const services = {
     tiktok: {
@@ -143,14 +142,24 @@ const Services = () => {
     setIsOrderModalOpen(true);
   };
 
-  const handleQuantityChange = (serviceKey: string, value: number, minOrder: number) => {
-    if (value >= minOrder) {
+  const handleQuantityChange = (serviceKey: string, value: string, minOrder: number) => {
+    // Allow empty string or valid numbers
+    if (value === '' || (!isNaN(Number(value)) && Number(value) >= 0)) {
       setQuantities(prev => ({ ...prev, [serviceKey]: value }));
     }
   };
 
-  const calculateTotalPrice = (pricePerUnit: number, quantity: number) => {
-    return (pricePerUnit * quantity).toFixed(2);
+  const getQuantityValue = (serviceKey: string, minOrder: number) => {
+    const value = quantities[serviceKey];
+    if (value === '' || value === undefined) return '';
+    const numValue = Number(value);
+    return numValue >= minOrder ? numValue : minOrder;
+  };
+
+  const calculateTotalPrice = (pricePerUnit: number, quantity: number | string) => {
+    const numQuantity = typeof quantity === 'string' ? Number(quantity) : quantity;
+    if (isNaN(numQuantity) || numQuantity <= 0) return '0.00';
+    return (pricePerUnit * numQuantity).toFixed(2);
   };
 
   const formatQuantity = (quantity: number) => {
@@ -169,7 +178,9 @@ const Services = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {serviceList.map((service: any, index: number) => {
             const serviceId = `${serviceKey}-${index}`;
-            const currentQuantity = quantities[serviceId] || service.minOrder;
+            const inputValue = quantities[serviceId] || '';
+            const currentQuantity = inputValue === '' ? service.minOrder : Math.max(Number(inputValue) || service.minOrder, service.minOrder);
+            const displayValue = inputValue === '' ? '' : inputValue;
             const totalPrice = calculateTotalPrice(service.pricePerUnit, currentQuantity);
 
             return (
@@ -201,11 +212,16 @@ const Services = () => {
                         type="number"
                         min={service.minOrder}
                         step={1}
-                        value={currentQuantity}
-                        onChange={(e) => handleQuantityChange(serviceId, parseInt(e.target.value) || service.minOrder, service.minOrder)}
+                        value={displayValue}
+                        onChange={(e) => handleQuantityChange(serviceId, e.target.value, service.minOrder)}
                         className="w-full"
                         placeholder={`Min ${service.minOrder}`}
                       />
+                      {inputValue !== '' && Number(inputValue) < service.minOrder && (
+                        <p className="text-xs text-red-500">
+                          Minimum order is {service.minOrder} {service.unit}{service.minOrder > 1 ? 's' : ''}
+                        </p>
+                      )}
                     </div>
 
                     <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border">
@@ -227,7 +243,8 @@ const Services = () => {
                         quantity: currentQuantity,
                         price: parseFloat(totalPrice),
                       })}
-                      className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-medium py-2 rounded-lg transition-all duration-300"
+                      disabled={inputValue !== '' && Number(inputValue) < service.minOrder}
+                      className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-medium py-2 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Order Now - KSh {totalPrice}
                     </Button>
