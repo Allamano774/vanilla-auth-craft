@@ -184,7 +184,7 @@ const Login = () => {
             </h2>
             
             <p className="text-gray-600 mb-6">
-              Welcome to NeuotechGains! Your account has been successfully created.
+              Welcome to NeurotechGains! Your account has been successfully created.
             </p>
             
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
@@ -248,7 +248,7 @@ const Login = () => {
               <div className="text-white font-bold text-xl">NG</div>
             </div>
             <h2 className="text-3xl font-bold text-gray-800 mb-2">
-              {isLogin ? "Welcome Back" : "Join NeuotechGains"}
+              {isLogin ? "Welcome Back" : "Join NeurotechGains"}
             </h2>
             <p className="text-gray-600">
               {isLogin 
@@ -414,7 +414,7 @@ const Login = () => {
                   {isLogin ? "Signing In..." : "Creating Account..."}
                 </div>
               ) : (
-                isLogin ? "Log In to NeuotechGains" : "Create Account"
+                isLogin ? "Log In to NeurotechGains" : "Create Account"
               )}
             </button>
           </form>
