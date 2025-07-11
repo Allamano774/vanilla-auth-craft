@@ -1,561 +1,179 @@
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { CreditCard, ArrowLeft, DollarSign, AlertCircle, CheckCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import DashboardLayout from "@/components/Layout/DashboardLayout";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CreditCard, Smartphone, DollarSign, History, RefreshCw } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import DashboardLayout from "@/components/Layout/DashboardLayout";
-
-// Declare PaystackPop for TypeScript
-declare global {
-  interface Window {
-    PaystackPop: {
-      setup: (config: {
-        key: string;
-        email: string;
-        amount: number;
-        currency: string;
-        ref: string;
-        label: string;
-        callback: (response: any) => void;
-        onClose: () => void;
-      }) => {
-        openIframe: () => void;
-      };
-    };
-  }
-}
 
 const Deposit = () => {
   const [amount, setAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("mpesa");
-  const [loading, setLoading] = useState(false);
-  const [paystackLoaded, setPaystackLoaded] = useState(false);
-  const [deposits, setDeposits] = useState<any[]>([]);
-  const [loadingDeposits, setLoadingDeposits] = useState(true);
-  const [autoRefreshing, setAutoRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  // Load Paystack script dynamically
-  useEffect(() => {
-    const loadPaystack = () => {
-      if (window.PaystackPop) {
-        setPaystackLoaded(true);
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://js.paystack.co/v1/inline.js';
-      script.async = true;
-      script.onload = () => {
-        console.log('Paystack script loaded successfully');
-        setPaystackLoaded(true);
-      };
-      script.onerror = () => {
-        console.error('Failed to load Paystack script');
-        toast({
-          title: "Payment System Error",
-          description: "Failed to load payment system. Please refresh the page and try again.",
-          variant: "destructive",
-        });
-      };
-      document.head.appendChild(script);
-    };
-
-    loadPaystack();
-  }, [toast]);
-
-  // Fetch user's completed deposit history only
-  const fetchDeposits = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from("deposits")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "completed") // Only show completed deposits
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching deposits:", error);
-        return;
-      }
-
-      setDeposits(data || []);
-    } catch (error) {
-      console.error("Error fetching deposits:", error);
-    } finally {
-      setLoadingDeposits(false);
-    }
-  };
-
-  // Initial fetch
-  useEffect(() => {
-    fetchDeposits();
-  }, []);
-
-  // Auto-refresh deposits every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log("Auto-refreshing deposits...");
-      setAutoRefreshing(true);
-      fetchDeposits().then(() => {
-        setAutoRefreshing(false);
-      });
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Manual refresh function
-  const handleRefreshDeposits = async () => {
-    setAutoRefreshing(true);
-    await fetchDeposits();
-    setAutoRefreshing(false);
-    toast({
-      title: "Deposits Refreshed",
-      description: "Your completed deposit history has been updated.",
-    });
-  };
-
-  const paymentMethods = [
-    { id: "mpesa", name: "M-Pesa (Paystack)", icon: Smartphone, description: "Pay with M-Pesa via Paystack" },
-    { id: "paypal", name: "PayPal", icon: CreditCard, description: "International payments (Coming Soon)" },
-    { id: "card", name: "Credit/Debit Card", icon: CreditCard, description: "Visa, MasterCard (Coming Soon)" },
-  ];
-
-  const quickAmounts = [20, 30, 50, 100, 250, 500];
-
-  const handleQuickAmount = (value: number) => {
-    setAmount(value.toString());
-  };
-
-  const payWithPaystack = async (depositAmount: number, depositId: string, transactionRef: string, userEmail: string): Promise<boolean> => {
-    return new Promise((resolve, reject) => {
-      if (!window.PaystackPop) {
-        reject(new Error("Paystack not loaded. Please refresh the page and try again."));
-        return;
-      }
-
-      if (!paystackLoaded) {
-        reject(new Error("Payment system is still loading. Please wait a moment and try again."));
-        return;
-      }
-
-      console.log("Initiating Paystack payment:", {
-        amount: depositAmount,
-        amountInCents: depositAmount * 100,
-        reference: transactionRef,
-        depositId,
-        email: userEmail
-      });
-
-      try {
-        const handler = window.PaystackPop.setup({
-          key: 'pk_live_c8d72323ec70238b1fb7ce3d5a42494560fbe815', 
-          email: userEmail, // Use actual user email
-          amount: depositAmount * 100, // Convert to cents (Paystack expects amount in kobo/cents)
-          currency: 'KES',
-          ref: transactionRef,
-          label: "Account Deposit",
-          callback: function(response: any) {
-            console.log("Paystack payment successful:", response);
-            
-            // Immediately update deposit status to completed
-            updateDepositStatus(depositId, "completed").then(() => {
-              console.log("Deposit status successfully updated to completed");
-              
-              toast({
-                title: "Payment Successful!",
-                description: `M-Pesa payment completed. Reference: ${response.reference}`,
-              });
-              
-              resolve(true);
-            }).catch((error) => {
-              console.error("Error updating deposit status after successful payment:", error);
-              // Still resolve as true since payment was successful
-              toast({
-                title: "Payment Successful!",
-                description: `M-Pesa payment completed. Reference: ${response.reference}. Status update pending.`,
-              });
-              resolve(true);
-            });
-          },
-          onClose: function() {
-            console.log("Paystack payment popup closed - marking as cancelled with reference:", transactionRef);
-            // Update the deposit status to cancelled when popup is closed
-            updateDepositStatus(depositId, "cancelled");
-            reject(new Error(`Payment was cancelled. Transaction reference: ${transactionRef}`));
-          }
-        });
-        
-        handler.openIframe();
-      } catch (error) {
-        console.error("Error opening Paystack iframe:", error);
-        // Update the deposit status to failed if there's an error
-        updateDepositStatus(depositId, "failed");
-        reject(new Error("Failed to open payment popup. Please try again."));
-      }
-    });
-  };
-
-  const updateDepositStatus = async (depositId: string, status: string) => {
-    try {
-      console.log(`Attempting to update deposit ${depositId} status to: ${status}`);
-      const { error } = await supabase
-        .from("deposits")
-        .update({ status })
-        .eq("id", depositId);
-
-      if (error) {
-        console.error("Error updating deposit status:", error);
-        throw error;
-      } else {
-        console.log(`Deposit ${depositId} status successfully updated to: ${status}`);
-        // Refresh deposits list to show updated status immediately
-        await fetchDeposits();
-      }
-    } catch (error) {
-      console.error("Error updating deposit status:", error);
-      throw error;
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to make a deposit",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const depositAmount = parseFloat(amount);
-
-    if (!depositAmount || depositAmount <= 0) {
+    
+    if (!depositAmount || depositAmount < 100) {
       toast({
-        title: "Invalid Amount",
-        description: "Please enter a valid amount greater than 0.",
+        title: "Invalid amount",
+        description: "Minimum deposit amount is KES 100",
         variant: "destructive",
       });
       return;
     }
 
-    if (depositAmount < 20) {
-      toast({
-        title: "Minimum Deposit",
-        description: "Minimum deposit amount is KES 20.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
+    setIsLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not authenticated");
-
-      // Generate transaction reference
-      const transactionRef = 'DEPOSIT_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-
-      // Create deposit record immediately when payment is initiated
-      console.log("Creating deposit record for amount:", depositAmount, "with reference:", transactionRef);
-      const { data: depositData, error: depositError } = await supabase
-        .from("deposits")
-        .insert({
-          user_id: user.id,
+      const { data, error } = await supabase.functions.invoke('process-payment', {
+        body: {
           amount: depositAmount,
-          payment_method: paymentMethod,
-          status: "pending",
-          transaction_reference: transactionRef,
-        })
-        .select()
-        .single();
+          email: user.email,
+        },
+      });
 
-      if (depositError) {
-        console.error("Error creating deposit record:", depositError);
-        throw new Error("Failed to create deposit record. Please try again.");
+      if (error) {
+        throw error;
       }
 
-      const depositId = depositData.id;
-      console.log("Deposit record created with ID:", depositId, "and reference:", transactionRef);
+      // Redirect to Paystack payment page
+      window.location.href = data.authorization_url;
 
-      // Refresh deposits list to show the new pending transaction
-      await fetchDeposits();
-
-      let paymentSuccess = false;
-
-      // Handle M-Pesa payment via Paystack
-      if (paymentMethod === "mpesa") {
-        if (!paystackLoaded) {
-          await updateDepositStatus(depositId, "failed");
-          throw new Error("Payment system is still loading. Please wait a moment and try again.");
-        }
-
-        try {
-          paymentSuccess = await payWithPaystack(depositAmount, depositId, transactionRef, user.email!);
-        } catch (error) {
-          console.error("M-Pesa payment error:", error);
-          const errorMessage = error instanceof Error ? error.message : "Payment failed. Please try again.";
-          toast({
-            title: "Payment Cancelled",
-            description: errorMessage,
-            variant: "destructive",
-          });
-          return;
-        }
-      } else {
-        // For other payment methods, mark as failed and show that they're not implemented yet
-        await updateDepositStatus(depositId, "failed");
-        toast({
-          title: "Payment Method Not Available",
-          description: `${paymentMethods.find(m => m.id === paymentMethod)?.name} is coming soon. Please use M-Pesa for now.`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (paymentSuccess) {
-        console.log("Processing successful payment for amount:", depositAmount);
-
-        // Get current balance
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("balance")
-          .eq("id", user.id)
-          .single();
-
-        if (profileError) {
-          console.error("Error fetching profile:", profileError);
-          throw new Error("Failed to update balance. Please contact support with your payment reference.");
-        }
-
-        const currentBalance = Number(profile?.balance) || 0;
-        const newBalance = currentBalance + depositAmount;
-
-        // Update user balance
-        const { error: balanceError } = await supabase
-          .from("profiles")
-          .update({ balance: newBalance })
-          .eq("id", user.id);
-
-        if (balanceError) {
-          console.error("Error updating balance:", balanceError);
-          throw new Error("Failed to update balance. Please contact support with your payment reference.");
-        }
-
-        console.log("Balance updated successfully:", { oldBalance: currentBalance, newBalance });
-
-        toast({
-          title: "Deposit Successful!",
-          description: `KES ${depositAmount.toFixed(2)} has been added to your account. New balance: KES ${newBalance.toFixed(2)}`,
-        });
-
-        setAmount("");
-        
-        // Refresh deposits list immediately
-        await fetchDeposits();
-      }
-    } catch (error) {
-      console.error("Error processing deposit:", error);
-      const errorMessage = error instanceof Error ? error.message : "There was an error processing your deposit. Please try again.";
+    } catch (error: any) {
+      console.error("Payment error:", error);
       toast({
-        title: "Deposit Failed",
-        description: errorMessage,
+        title: "Payment failed",
+        description: error.message || "Failed to initialize payment. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   return (
     <DashboardLayout>
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Add Funds</h1>
-          <p className="text-gray-600">Top up your account balance to start ordering services</p>
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Dashboard
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Deposit Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
-                Deposit Amount
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-3">
-                  <Label htmlFor="amount">Enter Amount (KES)</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    placeholder="0.00"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    min="2"
-                    step="0.01"
-                    required
-                  />
-                  <div className="grid grid-cols-3 gap-2">
-                    {quickAmounts.map((value) => (
-                      <Button
-                        key={value}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleQuickAmount(value)}
-                        className="text-sm"
-                      >
-                        KES {value}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Payment Method</Label>
-                  <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-                    {paymentMethods.map((method) => (
-                      <div key={method.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                        <RadioGroupItem value={method.id} id={method.id} />
-                        <div className="flex items-center space-x-3 flex-1">
-                          <method.icon className="w-5 h-5 text-gray-600" />
-                          <div>
-                            <Label htmlFor={method.id} className="font-medium cursor-pointer">
-                              {method.name}
-                            </Label>
-                            <p className="text-sm text-gray-500">{method.description}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
-
-                {paymentMethod === "mpesa" && !paystackLoaded && (
-                  <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
-                    <i className="fas fa-spinner fa-spin mr-2"></i>
-                    Loading payment system...
-                  </div>
-                )}
-
-                <div className="pt-4">
-                  <Button
-                    type="submit"
-                    disabled={loading || !amount || (paymentMethod === "mpesa" && !paystackLoaded)}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {loading ? "Processing..." : 
-                     paymentMethod === "mpesa" ? 
-                     `Pay KES ${(parseFloat(amount || "0")).toFixed(0)} via M-Pesa` : 
-                     `Deposit KES ${amount || "0.00"}`}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Completed Deposit History */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <History className="w-5 h-5" />
-                  Successful Deposits
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefreshDeposits}
-                  disabled={autoRefreshing}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className={`w-4 h-4 ${autoRefreshing ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {autoRefreshing && (
-                <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded-lg mb-4 flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Checking for new transactions...
-                </div>
-              )}
-              
-              {loadingDeposits ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                  <p className="text-gray-600 mt-2">Loading deposits...</p>
-                </div>
-              ) : deposits.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No successful deposits found</p>
-                  <p className="text-sm">Your completed deposits will appear here</p>
-                </div>
-              ) : (
-                <div className="max-h-96 overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Reference</TableHead>
-                        <TableHead>Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {deposits.map((deposit) => (
-                        <TableRow key={deposit.id}>
-                          <TableCell className="font-medium text-green-600">
-                            KES {Number(deposit.amount).toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-xs text-gray-600 font-mono">
-                            {deposit.transaction_reference || 'N/A'}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-600">
-                            {formatDate(deposit.created_at)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Add Funds</h1>
+          <p className="text-gray-600">Deposit money to your account to start purchasing services</p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Important Notes</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5" />
+              Deposit Funds
+            </CardTitle>
+            <CardDescription>
+              Add money to your account balance to purchase social media services
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-gray-600">
-            <p>• Minimum deposit amount is KES 20</p>
-            <p>• M-Pesa and airtel money payments are processed via Paystack</p>
-            <p>• Only M-Pesa and airtel money currently available - other methods coming soon</p>
-            <p>• Deposits are usually processed instantly</p>
-            <p>• Only successful deposits are displayed in the history</p>
-            <p>• All payments are secure and encrypted</p>
-            <p>• Contact support if you encounter any issues</p>
+          <CardContent>
+            <form onSubmit={handleDeposit} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="amount">Amount (KES)</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    id="amount"
+                    type="number"
+                    placeholder="Enter amount"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="pl-10"
+                    min="100"
+                    step="1"
+                    required
+                  />
+                </div>
+                <p className="text-sm text-gray-500">Minimum deposit: KES 100</p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-medium text-blue-900">Secure Payment</h3>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Your payment is processed securely through Paystack. We never store your payment information.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-medium text-yellow-900">Important Notice</h3>
+                    <ul className="text-sm text-yellow-700 mt-1 space-y-1">
+                      <li>• Deposits are non-refundable</li>
+                      <li>• Funds will be added to your account immediately after payment</li>
+                      <li>• Contact support if you experience any issues</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading}
+                size="lg"
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Processing...
+                  </div>
+                ) : (
+                  `Deposit KES ${amount || "0"}`
+                )}
+              </Button>
+            </form>
           </CardContent>
         </Card>
+
+        <div className="text-center">
+          <p className="text-sm text-gray-500">
+            Need help? Contact our{" "}
+            <Button variant="link" className="p-0 h-auto" onClick={() => navigate("/support")}>
+              support team
+            </Button>
+          </p>
+        </div>
       </div>
     </DashboardLayout>
   );
