@@ -131,7 +131,7 @@ const Deposit = () => {
     { id: "card", name: "Credit/Debit Card", icon: CreditCard, description: "Visa, MasterCard (Coming Soon)" },
   ];
 
-  const quickAmounts = [2, 20, 50, 100, 250, 500];
+  const quickAmounts = [20, 30, 50, 100, 250, 500];
 
   const handleQuickAmount = (value: number) => {
     setAmount(value.toString());
@@ -244,7 +244,7 @@ const Deposit = () => {
     if (depositAmount < 2) {
       toast({
         title: "Minimum Deposit",
-        description: "Minimum deposit amount is KES 2.",
+        description: "Minimum deposit amount is KES 20.",
         variant: "destructive",
       });
       return;
