@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -174,11 +173,17 @@ const OrderModal = ({ isOpen, onClose, service }: OrderModalProps) => {
                     Our support team is here to help you immediately.
                   </p>
                   <div className="bg-white rounded-lg p-3 border border-green-200">
-                    <p className="text-xs text-gray-600 mb-1">Contact Support via WhatsApp:</p>
-                    <p className="font-mono text-sm font-semibold text-green-700">
-                      📱 +254 XXX XXX XXX
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-gray-600 mb-2">Contact Support via WhatsApp:</p>
+                    <a
+                      href="https://wa.me/254785760507"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors font-medium text-sm"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      📱 +254 785 760 507
+                    </a>
+                    <p className="text-xs text-gray-500 mt-2">
                       Available 24/7 for immediate assistance
                     </p>
                   </div>
