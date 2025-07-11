@@ -42,18 +42,20 @@ serve(async (req) => {
     // Process each notification
     for (const notification of notifications || []) {
       try {
-        // Here you would integrate with a WhatsApp API service like Twilio
-        // For now, we'll just log the message and mark as sent
-        console.log(`Sending WhatsApp to +254785760507: ${notification.message}`);
-        
-        // In a real implementation, you would call WhatsApp API here
-        // Example with Twilio (you'd need to set up Twilio credentials):
-        /*
+        // Get Twilio credentials from environment variables
         const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
         const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-        const fromWhatsApp = 'whatsapp:+14155238886'; // Twilio sandbox number
-        const toWhatsApp = 'whatsapp:+254785760507';
+        const fromWhatsApp = Deno.env.get('TWILIO_WHATSAPP_FROM'); // Your Twilio WhatsApp number
+        const toWhatsApp = `whatsapp:+254785760507`; // Your WhatsApp number
+
+        if (!accountSid || !authToken || !fromWhatsApp) {
+          console.error('Missing Twilio credentials');
+          continue;
+        }
+
+        console.log(`Sending WhatsApp to ${toWhatsApp}: ${notification.message}`);
         
+        // Send WhatsApp message via Twilio
         const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
           method: 'POST',
           headers: {
@@ -63,21 +65,28 @@ serve(async (req) => {
           body: new URLSearchParams({
             From: fromWhatsApp,
             To: toWhatsApp,
-            Body: notification.message,
+            Body: `🚨 NEW ORDER ALERT!\n\n${notification.message}\n\nPlease check your admin panel to approve this order.`,
           }),
         });
-        */
 
-        // Mark notification as sent
-        const { error: updateError } = await supabaseClient
-          .from('admin_notifications')
-          .update({ sent: true })
-          .eq('id', notification.id);
+        const result = await response.json();
+        
+        if (response.ok) {
+          console.log('WhatsApp message sent successfully:', result.sid);
+          
+          // Mark notification as sent
+          const { error: updateError } = await supabaseClient
+            .from('admin_notifications')
+            .update({ sent: true })
+            .eq('id', notification.id);
 
-        if (updateError) {
-          console.error('Error updating notification:', updateError);
+          if (updateError) {
+            console.error('Error updating notification:', updateError);
+          } else {
+            console.log(`Notification ${notification.id} marked as sent`);
+          }
         } else {
-          console.log(`Notification ${notification.id} marked as sent`);
+          console.error('Error sending WhatsApp message:', result);
         }
       } catch (notificationError) {
         console.error('Error processing notification:', notificationError);
