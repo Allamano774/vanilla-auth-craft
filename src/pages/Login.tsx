@@ -9,12 +9,14 @@ interface FormData {
   fullName?: string;
   email: string;
   password: string;
+  confirmPassword?: string;
 }
 
 interface FormErrors {
   fullName?: string;
   email?: string;
   password?: string;
+  confirmPassword?: string;
 }
 
 const Login = () => {
@@ -23,8 +25,10 @@ const Login = () => {
     fullName: "",
     email: "",
     password: "",
+    confirmPassword: "",
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -52,6 +56,14 @@ const Login = () => {
       newErrors.password = "Password is required";
     } else if (formData.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters";
+    }
+
+    if (!isLogin) {
+      if (!formData.confirmPassword) {
+        newErrors.confirmPassword = "Please confirm your password";
+      } else if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = "Passwords do not match";
+      }
     }
 
     setErrors(newErrors);
@@ -138,7 +150,7 @@ const Login = () => {
 
   const toggleForm = () => {
     setIsLogin(!isLogin);
-    setFormData({ fullName: "", email: "", password: "" });
+    setFormData({ fullName: "", email: "", password: "", confirmPassword: "" });
     setErrors({});
   };
 
@@ -243,7 +255,7 @@ const Login = () => {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  Password
+                  {isLogin ? "Password" : "Create Password"}
                 </label>
                 {isLogin && (
                   <Link
@@ -283,6 +295,41 @@ const Login = () => {
                 </p>
               )}
             </div>
+
+            {!isLogin && (
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    value={formData.confirmPassword || ""}
+                    onChange={handleInputChange}
+                    className={`w-full pl-12 pr-12 py-3 border ${errors.confirmPassword ? 'border-red-400' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
+                    placeholder="Confirm your password"
+                    aria-describedby={errors.confirmPassword ? "confirmPassword-error" : undefined}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {errors.confirmPassword && (
+                  <p id="confirmPassword-error" className="text-red-500 text-sm mt-1 flex items-center">
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    {errors.confirmPassword}
+                  </p>
+                )}
+              </div>
+            )}
 
             <button
               type="submit"
