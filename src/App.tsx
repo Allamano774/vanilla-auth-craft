@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import AdminRoute from "@/components/AdminRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -87,9 +86,9 @@ const App = () => (
             <Route
               path="/admin/orders"
               element={
-                <AdminRoute>
+                <ProtectedRoute>
                   <AdminOrders />
-                </AdminRoute>
+                </ProtectedRoute>
               }
             />
             <Route path="*" element={<NotFound />} />
