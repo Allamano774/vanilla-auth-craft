@@ -1,13 +1,13 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CreditCard, ArrowLeft, DollarSign, AlertCircle, CheckCircle } from "lucide-react";
+import { ArrowLeft, CreditCard, Smartphone, Shield, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -70,6 +70,18 @@ const Deposit = () => {
     }
   };
 
+  const handlePaystackPayment = () => {
+    if (!amount || parseFloat(amount) < 100) {
+      toast({
+        title: "Invalid amount",
+        description: "Please enter a valid amount (minimum KES 100)",
+        variant: "destructive",
+      });
+      return;
+    }
+    handleDeposit(new Event('submit') as any);
+  };
+
   return (
     <DashboardLayout>
       <div className="max-w-2xl mx-auto space-y-6">
@@ -85,94 +97,159 @@ const Deposit = () => {
           </Button>
         </div>
 
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Add Funds</h1>
-          <p className="text-gray-600">Deposit money to your account to start purchasing services</p>
-        </div>
+        {/* Creative Payment Interface */}
+        <Card className="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-100">
+          <CardContent className="p-8 text-center">
+            <div className="mb-6">
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">
+                NeurotechGains Wallet
+              </h1>
+              <p className="text-gray-600 text-lg">
+                Secure payment for your account. Pay with<br/>
+                <span className="font-semibold text-blue-600">M-Pesa or Card</span>
+              </p>
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5" />
-              Deposit Funds
-            </CardTitle>
-            <CardDescription>
-              Add money to your account balance to purchase social media services
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleDeposit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="amount">Amount (KES)</Label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    id="amount"
-                    type="number"
-                    placeholder="Enter amount"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="pl-10"
-                    min="100"
-                    step="1"
-                    required
-                  />
-                </div>
-                <p className="text-sm text-gray-500">Minimum deposit: KES 100</p>
+            <div className="mb-8">
+              <Label htmlFor="amount" className="text-lg font-medium text-gray-700 mb-2 block">
+                Enter Amount
+              </Label>
+              <div className="relative max-w-xs mx-auto">
+                <Input
+                  id="amount"
+                  type="number"
+                  placeholder="100"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="text-center text-2xl font-bold h-14 border-2 border-blue-200 focus:border-blue-400"
+                  min="100"
+                  step="1"
+                />
+                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-xl font-bold text-gray-500">
+                  KES
+                </span>
               </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-medium text-blue-900">Secure Payment</h3>
-                    <p className="text-sm text-blue-700 mt-1">
-                      Your payment is processed securely through Paystack. We never store your payment information.
-                    </p>
-                  </div>
+              {amount && (
+                <div className="mt-3 text-3xl font-bold text-green-600">
+                  KES {parseFloat(amount || "0").toLocaleString()}
                 </div>
-              </div>
+              )}
+            </div>
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-medium text-yellow-900">Important Notice</h3>
-                    <ul className="text-sm text-yellow-700 mt-1 space-y-1">
-                      <li>• Deposits are non-refundable</li>
-                      <li>• Funds will be added to your account immediately after payment</li>
-                      <li>• Contact support if you experience any issues</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+            <button
+              onClick={handlePaystackPayment}
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-semibold py-4 px-6 rounded-xl text-lg transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 mb-6"
+            >
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Smartphone className="w-5 h-5" />
+                  Lipa na M-Pesa
+                </>
+              )}
+            </button>
 
-              <Button
-                type="submit"
-                className="w-full"
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-gradient-to-br from-blue-50 to-purple-50 text-gray-500">
+                  or pay with
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={handlePaystackPayment}
                 disabled={isLoading}
-                size="lg"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-2"
               >
-                {isLoading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Processing...
-                  </div>
-                ) : (
-                  `Deposit KES ${amount || "0"}`
-                )}
-              </Button>
-            </form>
+                <CreditCard className="w-4 h-4" />
+                Card
+              </button>
+              <button
+                onClick={handlePaystackPayment}
+                disabled={isLoading}
+                className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-medium py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-[1.02] flex items-center justify-center gap-2"
+              >
+                <Shield className="w-4 h-4" />
+                Bank
+              </button>
+            </div>
           </CardContent>
         </Card>
 
-        <div className="text-center">
-          <p className="text-sm text-gray-500">
-            Need help? Contact our{" "}
-            <Button variant="link" className="p-0 h-auto" onClick={() => navigate("/support")}>
-              support team
-            </Button>
+        {/* Security & Info Cards */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <Shield className="w-6 h-6 text-green-600 mt-1" />
+                <div>
+                  <h3 className="font-semibold text-green-900 mb-2">Secure Payment</h3>
+                  <p className="text-sm text-green-700">
+                    Your payment is processed securely through Paystack. We never store your payment information.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <Clock className="w-6 h-6 text-blue-600 mt-1" />
+                <div>
+                  <h3 className="font-semibold text-blue-900 mb-2">Instant Credit</h3>
+                  <p className="text-sm text-blue-700">
+                    Funds are added to your account immediately after successful payment confirmation.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Important Notice */}
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-6">
+            <h3 className="font-semibold text-yellow-900 mb-3">📋 Important Information</h3>
+            <ul className="text-sm text-yellow-800 space-y-2">
+              <li className="flex items-start gap-2">
+                <span className="text-yellow-600">•</span>
+                <span>Minimum deposit amount is KES 100</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-yellow-600">•</span>
+                <span>Deposits are non-refundable once processed</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-yellow-600">•</span>
+                <span>Contact support if you experience any payment issues</span>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
+
+        {/* Support Section */}
+        <div className="text-center pt-4">
+          <p className="text-sm text-gray-600 mb-3">
+            Need assistance with your payment?
           </p>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate("/support")}
+            className="text-blue-600 border-blue-200 hover:bg-blue-50"
+          >
+            Contact Support Team
+          </Button>
         </div>
       </div>
     </DashboardLayout>
