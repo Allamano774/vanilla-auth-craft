@@ -13,6 +13,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Process payment function started')
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -25,8 +27,10 @@ serve(async (req) => {
 
     // Get the authenticated user
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser()
+    console.log('Auth check:', { user: user?.email, error: authError })
 
     if (authError || !user) {
+      console.error('Authentication failed:', authError)
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -34,23 +38,31 @@ serve(async (req) => {
     }
 
     const { amount, email } = await req.json()
+    console.log('Payment request:', { amount, email })
 
     if (!amount || !email) {
+      console.error('Missing required fields:', { amount, email })
       return new Response(
         JSON.stringify({ error: 'Amount and email are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Initialize Paystack payment using the secret key from environment
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
+    // Get Paystack secret key from environment
+    const paystackSecretKey = Deno.env.get('sk_live_09f7f8e5af6e740cb15a901af1aefcdf8ccbd58b')
+    console.log('Paystack key check:', { hasKey: !!paystackSecretKey })
+    
     if (!paystackSecretKey) {
+      console.error('Paystack secret key not found')
       return new Response(
         JSON.stringify({ error: 'Payment configuration error' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    console.log('Initializing Paystack payment...')
+    
+    // Initialize Paystack payment
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
@@ -69,16 +81,22 @@ serve(async (req) => {
     })
 
     const paystackData = await paystackResponse.json()
+    console.log('Paystack response:', { 
+      status: paystackResponse.status, 
+      ok: paystackResponse.ok,
+      data: paystackData 
+    })
 
     if (!paystackResponse.ok) {
       console.error('Paystack error:', paystackData)
       return new Response(
-        JSON.stringify({ error: 'Payment initialization failed' }),
+        JSON.stringify({ error: 'Payment initialization failed', details: paystackData }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     // Create deposit record
+    console.log('Creating deposit record...')
     const { error: insertError } = await supabaseClient
       .from('deposits')
       .insert([
@@ -94,11 +112,12 @@ serve(async (req) => {
     if (insertError) {
       console.error('Database error:', insertError)
       return new Response(
-        JSON.stringify({ error: 'Failed to create deposit record' }),
+        JSON.stringify({ error: 'Failed to create deposit record', details: insertError }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    console.log('Payment initialization successful')
     return new Response(
       JSON.stringify({
         authorization_url: paystackData.data.authorization_url,
@@ -108,9 +127,9 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error in process-payment function:', error)
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
