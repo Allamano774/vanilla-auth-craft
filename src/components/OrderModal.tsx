@@ -92,6 +92,14 @@ const OrderModal = ({ isOpen, onClose, service }: OrderModalProps) => {
 
       if (balanceError) throw balanceError;
 
+      // Trigger WhatsApp notification (this will be handled by the database trigger)
+      try {
+        await supabase.functions.invoke('send-whatsapp-notification');
+      } catch (notificationError) {
+        console.error('Error sending WhatsApp notification:', notificationError);
+        // Don't fail the order if notification fails
+      }
+
       toast({
         title: "Order Placed Successfully!",
         description: `Your order for ${service.quantity} ${service.platform} ${service.type} has been placed.`,
@@ -151,12 +159,16 @@ const OrderModal = ({ isOpen, onClose, service }: OrderModalProps) => {
                   <h4 className="font-semibold text-gray-900 mb-2">⏰ Processing Timeline</h4>
                   <div className="space-y-2 text-sm text-gray-700">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span><strong>Minimum:</strong> 24 hours</span>
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                      <span><strong>Pending:</strong> Your order is received</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                      <span><strong>Maximum:</strong> 48 hours</span>
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span><strong>Approved:</strong> We're working on it</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span><strong>Completed:</strong> 24-48 hours</span>
                     </div>
                   </div>
                 </div>

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
@@ -90,16 +89,29 @@ const Orders = () => {
     switch (status) {
       case "completed":
         return "bg-green-100 text-green-800";
-      case "processing":
-        return "bg-blue-100 text-blue-800";
-      case "cancelled":
-        return "bg-red-100 text-red-800";
       case "approved":
-        return "bg-green-100 text-green-800";
+        return "bg-blue-100 text-blue-800";
       case "pending":
         return "bg-yellow-100 text-yellow-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getStatusDescription = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "Your order has been received and is awaiting approval";
+      case "approved":
+        return "Your order has been approved and is being processed";
+      case "completed":
+        return "Your order has been completed successfully";
+      case "cancelled":
+        return "Your order has been cancelled";
+      default:
+        return "Order status unknown";
     }
   };
 
@@ -121,7 +133,7 @@ const Orders = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Order History</h1>
-            <p className="text-gray-600">Track your service orders</p>
+            <p className="text-gray-600">Track your service orders: Pending → Approved → Completed</p>
           </div>
           <Button
             variant="outline"
@@ -138,7 +150,7 @@ const Orders = () => {
         {refreshing && (
           <div className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg flex items-center gap-2">
             <RefreshCw className="w-4 h-4 animate-spin" />
-            Checking for new orders...
+            Checking for order updates...
           </div>
         )}
 
@@ -167,9 +179,14 @@ const Orders = () => {
                       <CardTitle className="text-lg">{order.service_name}</CardTitle>
                       <p className="text-sm text-gray-600">{order.service_type}</p>
                     </div>
-                    <Badge className={getStatusColor(order.status || "pending")}>
-                      {order.status || "pending"}
-                    </Badge>
+                    <div className="text-right">
+                      <Badge className={getStatusColor(order.status || "pending")}>
+                        {(order.status || "pending").toUpperCase()}
+                      </Badge>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {getStatusDescription(order.status || "pending")}
+                      </p>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -193,6 +210,26 @@ const Orders = () => {
                     <p className="text-sm font-medium text-gray-700">Target URL</p>
                     <p className="text-sm text-gray-600 break-all">{order.target_url}</p>
                   </div>
+                  
+                  {/* Status timeline for pending/approved orders */}
+                  {(order.status === "pending" || order.status === "approved") && (
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border">
+                      <div className="flex items-center gap-2 text-sm text-blue-700">
+                        <Clock className="h-4 w-4" />
+                        <span className="font-medium">
+                          {order.status === "pending" 
+                            ? "⏳ Awaiting approval - We'll start processing soon!"
+                            : "🔄 Processing your order - Expected completion: 24-48 hours"
+                          }
+                        </span>
+                      </div>
+                      {order.status === "approved" && (
+                        <p className="text-xs text-blue-600 mt-2">
+                          Need help? Contact support at +254 785 760 507 if not completed within 48 hours
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
