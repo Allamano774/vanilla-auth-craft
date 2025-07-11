@@ -547,7 +547,7 @@ const Deposit = () => {
             <CardTitle>Important Notes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-gray-600">
-            <p>• Minimum deposit amount is KES 2</p>
+            <p>• Minimum deposit amount is KES 20</p>
             <p>• M-Pesa payments are processed via Paystack</p>
             <p>• Only M-Pesa is currently available - other methods coming soon</p>
             <p>• Deposits are usually processed instantly</p>
