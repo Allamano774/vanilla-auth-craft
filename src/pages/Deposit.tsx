@@ -241,7 +241,7 @@ const Deposit = () => {
       return;
     }
 
-    if (depositAmount < 2) {
+    if (depositAmount < 20) {
       toast({
         title: "Minimum Deposit",
         description: "Minimum deposit amount is KES 20.",
