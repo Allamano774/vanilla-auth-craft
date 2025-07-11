@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -160,21 +161,68 @@ const Services = () => {
       icon: <ThumbsUp className="h-6 w-6" />,
       color: "from-blue-500 to-blue-700",
       services: {
+        verification: [
+          { 
+            name: "Facebook Verification (Blue Tick)", 
+            minOrder: 1, 
+            pricePerUnit: 1700, 
+            unit: "verification",
+            icon: <Badge className="h-5 w-5" />
+          },
+        ],
         followers: [
-          { quantity: 200, price: 100 },
-          { quantity: 1000, price: 400 },
-          { quantity: 10000, price: 3500 },
-          { quantity: 100000, price: 32150 },
-          { quantity: 1000000, price: 320400 },
+          { 
+            name: "Facebook Followers", 
+            minOrder: 50, 
+            pricePerUnit: 0.46, 
+            unit: "follower",
+            icon: <Users className="h-5 w-5" />
+          },
         ],
         likes: [
-          { quantity: 100, price: 40 },
-          { quantity: 200, price: 80 },
-          { quantity: 1000, price: 300 },
-          { quantity: 2000, price: 600 },
-          { quantity: 3000, price: 800 },
-          { quantity: 4000, price: 1000 },
-          { quantity: 5000, price: 1500 },
+          { 
+            name: "Facebook Likes", 
+            minOrder: 10, 
+            pricePerUnit: 0.0103, 
+            unit: "like",
+            icon: <Heart className="h-5 w-5" />
+          },
+        ],
+        views: [
+          { 
+            name: "Facebook Video Views", 
+            minOrder: 100, 
+            pricePerUnit: 0.003528, 
+            unit: "view",
+            icon: <Eye className="h-5 w-5" />
+          },
+        ],
+        mentions: [
+          { 
+            name: "Facebook Mentions", 
+            minOrder: 50, 
+            pricePerUnit: 9, 
+            unit: "mention",
+            icon: <AtSign className="h-5 w-5" />
+          },
+        ],
+        storyViews: [
+          { 
+            name: "Facebook Story Views", 
+            minOrder: 20, 
+            pricePerUnit: 0.07267, 
+            unit: "story view",
+            icon: <Play className="h-5 w-5" />
+          },
+        ],
+        commentsLikes: [
+          { 
+            name: "Facebook Comments + Likes", 
+            minOrder: 20, 
+            pricePerUnit: 0.6, 
+            unit: "combo engagement",
+            icon: <MessageCircle className="h-5 w-5" />
+          },
         ],
       }
     }
@@ -391,53 +439,93 @@ const Services = () => {
     ));
   };
 
-  const renderOtherPlatformServices = (platformKey: string, platform: any) => {
-    return Object.entries(platform.services).map(([serviceType, serviceList]: [string, any]) => (
-      <Card key={serviceType} className="overflow-hidden shadow-md">
-        <div className={`bg-gradient-to-r ${platform.color} p-4`}>
-          <div className="flex items-center gap-3 text-white">
-            {serviceType === 'followers' ? <Users className="h-5 w-5" /> : 
-             serviceType === 'likes' ? <Heart className="h-5 w-5" /> : 
-             serviceType === 'views' ? <Eye className="h-5 w-5" /> : 
-             <Video className="h-5 w-5" />}
-            <CardTitle className="text-lg capitalize text-white">
-              {platform.name} {serviceType}
-            </CardTitle>
-          </div>
-        </div>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {serviceList.map((service: any, index: number) => (
-              <div
-                key={index}
-                className="border rounded-lg p-4 hover:shadow-md transition-all duration-300 bg-gradient-to-br from-white to-gray-50"
-              >
-                <div className="text-center space-y-3">
-                  <div>
-                    <p className="font-semibold text-lg text-gray-800">
-                      {formatQuantity(service.quantity)} {serviceType}
-                    </p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      KSh {service.price.toFixed(2)}
-                    </p>
+  const renderFacebookServices = () => {
+    return Object.entries(services.facebook.services).map(([serviceKey, serviceList]) => (
+      <div key={serviceKey} className="mb-8">
+        <h3 className="text-xl font-semibold mb-4 text-gray-800 capitalize">
+          {serviceKey === 'storyViews' ? 'Story Views' : 
+           serviceKey === 'commentsLikes' ? 'Comments + Likes' : serviceKey}
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {serviceList.map((service: any, index: number) => {
+            const serviceId = `facebook-${serviceKey}-${index}`;
+            const inputValue = quantities[serviceId] || '';
+            const currentQuantity = inputValue === '' ? service.minOrder : Math.max(Number(inputValue) || service.minOrder, service.minOrder);
+            const displayValue = inputValue === '' ? '' : inputValue;
+            const totalPrice = calculateTotalPrice(service.pricePerUnit, currentQuantity);
+
+            return (
+              <Card key={index} className="overflow-hidden hover:shadow-lg transition-all duration-300 border-0 shadow-md">
+                <div className="bg-gradient-to-r from-blue-500 to-blue-700 p-4">
+                  <div className="flex items-center gap-3 text-white">
+                    {service.icon}
+                    <h4 className="font-semibold text-lg">{service.name}</h4>
                   </div>
-                  <Button
-                    onClick={() => handleOrderClick({
-                      platform: platform.name,
-                      type: serviceType,
-                      quantity: service.quantity,
-                      price: service.price,
-                    })}
-                    className={`w-full bg-gradient-to-r ${platform.color} hover:opacity-90 text-white font-medium transition-all duration-300`}
-                  >
-                    Order Now
-                  </Button>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+                
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Badge variant="secondary" className="text-xs">
+                        Min: {service.minOrder} {service.unit}{service.minOrder > 1 ? 's' : ''}
+                      </Badge>
+                      <span className="text-sm font-medium text-gray-600">
+                        KSh {service.pricePerUnit.toFixed(4)} per {service.unit}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={serviceId} className="text-sm font-medium">
+                        Quantity ({service.unit}{currentQuantity > 1 ? 's' : ''})
+                      </Label>
+                      <Input
+                        id={serviceId}
+                        type="number"
+                        min={service.minOrder}
+                        step={1}
+                        value={displayValue}
+                        onChange={(e) => handleQuantityChange(serviceId, e.target.value, service.minOrder)}
+                        className="w-full"
+                        placeholder={`Min ${service.minOrder}`}
+                      />
+                      {inputValue !== '' && Number(inputValue) < service.minOrder && (
+                        <p className="text-xs text-red-500">
+                          Minimum order is {service.minOrder} {service.unit}{service.minOrder > 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border">
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600 mb-1">Total Cost</p>
+                        <p className="text-2xl font-bold text-blue-600">
+                          KSh {totalPrice}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {currentQuantity} × KSh {service.pricePerUnit.toFixed(4)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={() => handleOrderClick({
+                        platform: "Facebook",
+                        type: service.name,
+                        quantity: currentQuantity,
+                        price: parseFloat(totalPrice),
+                      })}
+                      disabled={inputValue !== '' && Number(inputValue) < service.minOrder}
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-medium py-2 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Order Now - KSh {totalPrice}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
     ));
   };
 
@@ -485,18 +573,16 @@ const Services = () => {
             {renderInstagramServices()}
           </TabsContent>
 
-          {Object.entries(services).filter(([key]) => key !== 'instagram' && key !== 'tiktok').map(([platformKey, platform]) => (
-            <TabsContent key={platformKey} value={platformKey} className="space-y-6">
-              <div className={`bg-gradient-to-r ${platform.color} rounded-lg p-6 text-white text-center`}>
-                <div className="flex items-center justify-center gap-3 mb-2">
-                  {platform.icon}
-                  <h2 className="text-3xl font-bold">{platform.name} Services</h2>
-                </div>
-                <p className="opacity-90">Grow your {platform.name} presence effectively</p>
+          <TabsContent value="facebook" className="space-y-6">
+            <div className="bg-gradient-to-r from-blue-500 to-blue-700 rounded-lg p-6 text-white text-center">
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <ThumbsUp className="h-8 w-8" />
+                <h2 className="text-3xl font-bold">Facebook Services</h2>
               </div>
-              {renderOtherPlatformServices(platformKey, platform)}
-            </TabsContent>
-          ))}
+              <p className="text-blue-100">Professional Facebook growth solutions</p>
+            </div>
+            {renderFacebookServices()}
+          </TabsContent>
         </Tabs>
       </div>
 
