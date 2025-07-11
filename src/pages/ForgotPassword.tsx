@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Mail, ArrowLeft, AlertCircle, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,11 +10,24 @@ const ForgotPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [canResend, setCanResend] = useState(true);
+  const [countdown, setCountdown] = useState(0);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+  const startCountdown = () => {
+    setCanResend(false);
+    setCountdown(60);
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setCanResend(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,8 +39,17 @@ const ForgotPassword = () => {
       return;
     }
 
-    if (!validateEmail(email)) {
+    if (!/\S+@\S+\.\S+/.test(email)) {
       setError("Please enter a valid email address");
+      return;
+    }
+
+    if (!canResend) {
+      toast({
+        title: "Please wait",
+        description: `You can request another reset email in ${countdown} seconds`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -38,24 +60,36 @@ const ForgotPassword = () => {
         redirectTo: `${window.location.origin}/reset-password`,
       });
 
-      if (error) throw error;
-
-      setIsSuccess(true);
-      toast({
-        title: "Reset Link Sent!",
-        description: "Check your email for password reset instructions.",
-      });
+      if (error) {
+        // Handle specific error cases
+        if (error.message.includes('rate limit') || error.message.includes('security purposes')) {
+          setError("Too many reset attempts. Please wait before trying again.");
+          startCountdown();
+        } else if (error.message.includes('not found') || error.message.includes('invalid')) {
+          setError("If this email is registered, you'll receive a reset link shortly.");
+          setIsSuccess(true); // Still show success to prevent email enumeration
+        } else {
+          setError(error.message);
+        }
+      } else {
+        setIsSuccess(true);
+        startCountdown();
+        toast({
+          title: "Reset email sent!",
+          description: "Check your email for the password reset link.",
+        });
+      }
     } catch (error: any) {
-      console.error("Reset password error:", error);
-      setError(error.message || "Something went wrong. Please try again.");
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send reset email.",
-        variant: "destructive",
-      });
+      console.error("Password reset error:", error);
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleResendEmail = async () => {
+    if (!canResend || !email) return;
+    await handleSubmit(new Event('submit') as any);
   };
 
   return (
@@ -83,10 +117,10 @@ const ForgotPassword = () => {
               <div className="text-white font-bold text-xl">NG</div>
             </div>
             <h2 className="text-3xl font-bold text-gray-800 mb-2">
-              Forgot Password?
+              Reset Your Password
             </h2>
             <p className="text-gray-600">
-              No worries! Enter your email and we'll send you reset instructions.
+              Enter your email address and we'll send you a link to reset your password.
             </p>
           </div>
 
@@ -99,15 +133,23 @@ const ForgotPassword = () => {
                 Check Your Email
               </h3>
               <p className="text-gray-600 mb-6">
-                We've sent password reset instructions to <strong>{email}</strong>
+                If an account with <strong>{email}</strong> exists, you'll receive a password reset link shortly.
               </p>
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center w-full font-semibold py-3 rounded-xl text-white transition-all duration-300 hover:shadow-xl"
-                style={{ background: 'linear-gradient(135deg, #00d8ff 0%, #0099cc 100%)' }}
-              >
-                Back to Login
-              </Link>
+              <div className="space-y-3">
+                <button
+                  onClick={handleResendEmail}
+                  disabled={!canResend}
+                  className="w-full py-2 px-4 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {canResend ? "Resend Email" : `Resend in ${countdown}s`}
+                </button>
+                <button
+                  onClick={() => navigate("/login")}
+                  className="w-full py-2 px-4 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Back to Login
+                </button>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -121,9 +163,13 @@ const ForgotPassword = () => {
                     id="email"
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError("");
+                    }}
                     className={`w-full pl-12 pr-4 py-3 border ${error ? 'border-red-400' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
                     placeholder="Enter your email address"
+                    required
                     aria-describedby={error ? "email-error" : undefined}
                   />
                   {error && (
@@ -142,10 +188,10 @@ const ForgotPassword = () => {
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || !canResend}
                 className="w-full font-semibold py-3 rounded-xl text-white transition-all duration-300 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
                 style={{ 
-                  background: isLoading ? '#gray' : 'linear-gradient(135deg, #00d8ff 0%, #0099cc 100%)'
+                  background: isLoading || !canResend ? '#gray' : 'linear-gradient(135deg, #00d8ff 0%, #0099cc 100%)'
                 }}
               >
                 {isLoading ? (
@@ -153,6 +199,8 @@ const ForgotPassword = () => {
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                     Sending Reset Link...
                   </div>
+                ) : !canResend ? (
+                  `Resend in ${countdown}s`
                 ) : (
                   "Send Reset Link"
                 )}

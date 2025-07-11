@@ -21,50 +21,74 @@ const ResetPassword = () => {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // Get the current session to check if user is authenticated via reset link
+        // Check if we have URL hash parameters (typical for reset password links)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type');
+
+        console.log('Hash params:', { type, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken });
+
+        // If we have tokens in the URL, set the session
+        if (accessToken && refreshToken && type === 'recovery') {
+          try {
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+
+            if (error) {
+              console.error("Set session error:", error);
+              throw error;
+            }
+
+            if (data.session) {
+              console.log('Session set successfully');
+              setIsValidSession(true);
+              setIsCheckingSession(false);
+              return;
+            }
+          } catch (error) {
+            console.error("Failed to set session:", error);
+          }
+        }
+
+        // Fallback: check current session
         const { data: { session }, error } = await supabase.auth.getSession();
         
+        console.log('Current session check:', { hasSession: !!session, error });
+
         if (error) {
           console.error("Session error:", error);
-          toast({
-            title: "Invalid Reset Link",
-            description: "This password reset link is invalid or has expired.",
-            variant: "destructive",
-          });
-          navigate("/forgot-password");
-          return;
+          throw error;
         }
 
         if (!session) {
-          toast({
-            title: "Invalid Reset Link",
-            description: "This password reset link is invalid or has expired.",
-            variant: "destructive",
-          });
-          navigate("/forgot-password");
-          return;
+          throw new Error("No active session");
         }
 
-        // Check if this is a recovery session
-        const isRecovery = session.user?.recovery_sent_at;
-        if (!isRecovery) {
-          toast({
-            title: "Invalid Reset Link",
-            description: "This password reset link is invalid or has expired.",
-            variant: "destructive",
-          });
-          navigate("/forgot-password");
-          return;
+        // Additional validation for recovery sessions
+        const user = session.user;
+        if (user && (user.recovery_sent_at || type === 'recovery')) {
+          setIsValidSession(true);
+        } else {
+          throw new Error("Not a valid recovery session");
         }
-
-        setIsValidSession(true);
       } catch (error) {
-        console.error("Error checking session:", error);
+        console.error("Session validation failed:", error);
         toast({
           title: "Invalid Reset Link",
-          description: "This password reset link is invalid or has expired.",
+          description: "This password reset link is invalid or has expired. Please request a new one.",
           variant: "destructive",
         });
+        
+        // Clean up any existing session and redirect
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutError) {
+          console.error("Sign out error:", signOutError);
+        }
+        
         navigate("/forgot-password");
       } finally {
         setIsCheckingSession(false);
@@ -112,7 +136,10 @@ const ResetPassword = () => {
         password: password
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Password update error:", error);
+        throw error;
+      }
 
       setIsSuccess(true);
       toast({
@@ -120,16 +147,30 @@ const ResetPassword = () => {
         description: "Your password has been successfully updated.",
       });
 
-      // Sign out the user and redirect to login after a short delay
+      // Sign out and redirect after a short delay
       setTimeout(async () => {
-        await supabase.auth.signOut();
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutError) {
+          console.error("Sign out error:", signOutError);
+        }
         navigate("/login");
       }, 2000);
     } catch (error: any) {
       console.error("Password update error:", error);
+      
+      let errorMessage = "Failed to update password. Please try again.";
+      
+      if (error.message?.includes('session')) {
+        errorMessage = "Your session has expired. Please request a new password reset link.";
+        setTimeout(() => navigate("/forgot-password"), 2000);
+      } else if (error.message?.includes('weak')) {
+        errorMessage = "Password is too weak. Please choose a stronger password.";
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to update password. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -191,11 +232,11 @@ const ResetPassword = () => {
     >
       <div className="max-w-md w-full">
         <Link
-          to="/login"
+          to="/forgot-password"
           className="inline-flex items-center text-white/80 hover:text-white mb-6 transition-colors group"
         >
           <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-          Back to Login
+          Back
         </Link>
 
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20">
