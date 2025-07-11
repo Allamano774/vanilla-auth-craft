@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Lock, ArrowLeft, AlertCircle, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,24 +13,66 @@ const ResetPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errors, setErrors] = useState<{ password?: string; confirmPassword?: string }>({});
-  const [searchParams] = useSearchParams();
+  const [isValidSession, setIsValidSession] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if we have the necessary tokens in the URL
-    const accessToken = searchParams.get('access_token');
-    const refreshToken = searchParams.get('refresh_token');
-    
-    if (!accessToken || !refreshToken) {
-      toast({
-        title: "Invalid Reset Link",
-        description: "This password reset link is invalid or has expired.",
-        variant: "destructive",
-      });
-      navigate("/forgot-password");
-    }
-  }, [searchParams, navigate, toast]);
+    const checkSession = async () => {
+      try {
+        // Get the current session to check if user is authenticated via reset link
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Session error:", error);
+          toast({
+            title: "Invalid Reset Link",
+            description: "This password reset link is invalid or has expired.",
+            variant: "destructive",
+          });
+          navigate("/forgot-password");
+          return;
+        }
+
+        if (!session) {
+          toast({
+            title: "Invalid Reset Link",
+            description: "This password reset link is invalid or has expired.",
+            variant: "destructive",
+          });
+          navigate("/forgot-password");
+          return;
+        }
+
+        // Check if this is a recovery session
+        const isRecovery = session.user?.recovery_sent_at;
+        if (!isRecovery) {
+          toast({
+            title: "Invalid Reset Link",
+            description: "This password reset link is invalid or has expired.",
+            variant: "destructive",
+          });
+          navigate("/forgot-password");
+          return;
+        }
+
+        setIsValidSession(true);
+      } catch (error) {
+        console.error("Error checking session:", error);
+        toast({
+          title: "Invalid Reset Link",
+          description: "This password reset link is invalid or has expired.",
+          variant: "destructive",
+        });
+        navigate("/forgot-password");
+      } finally {
+        setIsCheckingSession(false);
+      }
+    };
+
+    checkSession();
+  }, [navigate, toast]);
 
   const validateForm = () => {
     const newErrors: { password?: string; confirmPassword?: string } = {};
@@ -78,11 +120,13 @@ const ResetPassword = () => {
         description: "Your password has been successfully updated.",
       });
 
-      // Redirect to login after a short delay
-      setTimeout(() => {
+      // Sign out the user and redirect to login after a short delay
+      setTimeout(async () => {
+        await supabase.auth.signOut();
         navigate("/login");
       }, 2000);
     } catch (error: any) {
+      console.error("Password update error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to update password. Please try again.",
@@ -107,6 +151,33 @@ const ResetPassword = () => {
       }));
     }
   };
+
+  // Show loading while checking session
+  if (isCheckingSession) {
+    return (
+      <div 
+        className="min-h-screen flex items-center justify-center p-4 relative"
+        style={{
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('https://images.unsplash.com/photo-1611224923853-80b023f02d71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2339&q=80')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        <div className="max-w-md w-full">
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Verifying reset link...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render the form if session is invalid
+  if (!isValidSession) {
+    return null;
+  }
 
   return (
     <div 

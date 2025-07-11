@@ -46,6 +46,7 @@ const ForgotPassword = () => {
         description: "Check your email for password reset instructions.",
       });
     } catch (error: any) {
+      console.error("Reset password error:", error);
       setError(error.message || "Something went wrong. Please try again.");
       toast({
         title: "Error",
