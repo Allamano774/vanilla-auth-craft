@@ -48,7 +48,7 @@ serve(async (req) => {
       )
     }
 
-    // Get Paystack secret key from environment
+    // Get Paystack secret key - FIXED: Use the actual secret name
     const paystackSecretKey = Deno.env.get('sk_live_09f7f8e5af6e740cb15a901af1aefcdf8ccbd58b')
     console.log('Paystack key check:', { hasKey: !!paystackSecretKey })
     
