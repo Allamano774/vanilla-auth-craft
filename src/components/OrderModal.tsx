@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Clock, MessageCircle, CheckCircle } from "lucide-react";
 
 interface OrderModalProps {
   isOpen: boolean;
@@ -22,12 +23,14 @@ const OrderModal = ({ isOpen, onClose, service }: OrderModalProps) => {
   const [targetUrl, setTargetUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
+  const [orderPlaced, setOrderPlaced] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen) {
       fetchUserBalance();
       setTargetUrl("");
+      setOrderPlaced(false);
     }
   }, [isOpen]);
 
@@ -95,7 +98,7 @@ const OrderModal = ({ isOpen, onClose, service }: OrderModalProps) => {
         description: `Your order for ${service.quantity} ${service.platform} ${service.type} has been placed.`,
       });
 
-      onClose();
+      setOrderPlaced(true);
     } catch (error) {
       console.error("Error placing order:", error);
       toast({
@@ -108,9 +111,94 @@ const OrderModal = ({ isOpen, onClose, service }: OrderModalProps) => {
     }
   };
 
+  const handleClose = () => {
+    setOrderPlaced(false);
+    onClose();
+  };
+
   if (!service) return null;
 
   const canAfford = userBalance >= service.price;
+
+  // Show completion timeline after successful order
+  if (orderPlaced) {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="h-5 w-5" />
+              Order Placed Successfully!
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="h-8 w-8 text-green-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Your {service.platform} order is being processed
+              </h3>
+              <p className="text-gray-600">
+                {service.quantity} {service.type} for your account
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border">
+              <div className="flex items-start gap-3">
+                <Clock className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">⏰ Processing Timeline</h4>
+                  <div className="space-y-2 text-sm text-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span><strong>Minimum:</strong> 24 hours</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      <span><strong>Maximum:</strong> 48 hours</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+              <div className="flex items-start gap-3">
+                <MessageCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">🤝 Need Help?</h4>
+                  <p className="text-sm text-gray-700 mb-3">
+                    If your order isn't completed within 48 hours, don't worry! 
+                    Our support team is here to help you immediately.
+                  </p>
+                  <div className="bg-white rounded-lg p-3 border border-green-200">
+                    <p className="text-xs text-gray-600 mb-1">Contact Support via WhatsApp:</p>
+                    <p className="font-mono text-sm font-semibold text-green-700">
+                      📱 +254 XXX XXX XXX
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Available 24/7 for immediate assistance
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <Button
+                onClick={handleClose}
+                className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+              >
+                Got it, Thanks! 🎉
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
