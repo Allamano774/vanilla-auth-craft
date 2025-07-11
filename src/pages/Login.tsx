@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, AlertCircle, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -21,6 +21,8 @@ interface FormErrors {
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [showEmailVerification, setShowEmailVerification] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     email: "",
@@ -130,11 +132,9 @@ const Login = () => {
         if (error) throw error;
 
         if (data.user) {
-          toast({
-            title: "Account Created!",
-            description: "Welcome to NeuotechGains! Your account has been successfully created.",
-          });
-          navigate("/dashboard");
+          setUserEmail(formData.email);
+          setShowEmailVerification(true);
+          setFormData({ fullName: "", email: "", password: "", confirmPassword: "" });
         }
       }
     } catch (error: any) {
@@ -152,7 +152,76 @@ const Login = () => {
     setIsLogin(!isLogin);
     setFormData({ fullName: "", email: "", password: "", confirmPassword: "" });
     setErrors({});
+    setShowEmailVerification(false);
   };
+
+  const handleBackToLogin = () => {
+    setShowEmailVerification(false);
+    setIsLogin(true);
+    setFormData({ fullName: "", email: "", password: "", confirmPassword: "" });
+    setErrors({});
+  };
+
+  if (showEmailVerification) {
+    return (
+      <div 
+        className="min-h-screen flex items-center justify-center p-4 relative"
+        style={{
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('https://images.unsplash.com/photo-1611224923853-80b023f02d71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2339&q=80')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        <div className="max-w-md w-full">
+          <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-6">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+            
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">
+              Account Created!
+            </h2>
+            
+            <p className="text-gray-600 mb-6">
+              Welcome to NeuotechGains! Your account has been successfully created.
+            </p>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+              <div className="flex items-center mb-2">
+                <Mail className="w-5 h-5 text-blue-600 mr-2" />
+                <h3 className="font-semibold text-blue-800">Check Your Email</h3>
+              </div>
+              <p className="text-blue-700 text-sm">
+                We've sent a verification link to <strong>{userEmail}</strong>. 
+                Please check your email and click the link to verify your account.
+              </p>
+            </div>
+            
+            <div className="text-sm text-gray-500 mb-6">
+              <p>Didn't receive the email? Check your spam folder or</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="text-blue-600 hover:underline font-medium"
+              >
+                try again
+              </button>
+            </div>
+            
+            <button
+              onClick={handleBackToLogin}
+              className="w-full font-semibold py-3 rounded-xl text-white transition-all duration-300 hover:shadow-xl"
+              style={{ 
+                background: 'linear-gradient(135deg, #00d8ff 0%, #0099cc 100%)'
+              }}
+            >
+              Back to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
