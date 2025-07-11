@@ -5,7 +5,7 @@ import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type Order = Tables<"orders">;
