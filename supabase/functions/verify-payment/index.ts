@@ -27,10 +27,18 @@ serve(async (req) => {
       )
     }
 
-    // Verify payment with Paystack
+    // Verify payment with Paystack using the secret key from environment
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
+    if (!paystackSecretKey) {
+      return new Response(
+        JSON.stringify({ error: 'Payment configuration error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('PAYSTACK_SECRET_KEY')}`,
+        'Authorization': `Bearer ${paystackSecretKey}`,
       },
     })
 
