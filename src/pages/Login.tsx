@@ -1,27 +1,31 @@
 
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Mail, Lock, ArrowLeft, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
-interface LoginFormData {
+interface FormData {
+  fullName?: string;
   email: string;
   password: string;
 }
 
-interface LoginErrors {
+interface FormErrors {
+  fullName?: string;
   email?: string;
   password?: string;
 }
 
 const Login = () => {
-  const [formData, setFormData] = useState<LoginFormData>({
+  const [isLogin, setIsLogin] = useState(true);
+  const [formData, setFormData] = useState<FormData>({
+    fullName: "",
     email: "",
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<LoginErrors>({});
+  const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -32,7 +36,11 @@ const Login = () => {
   };
 
   const validateForm = () => {
-    const newErrors: LoginErrors = {};
+    const newErrors: FormErrors = {};
+
+    if (!isLogin && (!formData.fullName || formData.fullName.trim().length < 2)) {
+      newErrors.fullName = "Full name must be at least 2 characters";
+    }
 
     if (!formData.email) {
       newErrors.email = "Email is required";
@@ -57,7 +65,7 @@ const Login = () => {
       [name]: value
     }));
     
-    if (errors[name as keyof LoginErrors]) {
+    if (errors[name as keyof FormErrors]) {
       setErrors(prev => ({
         ...prev,
         [name]: ""
@@ -80,24 +88,47 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password,
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        toast({
-          title: "Success!",
-          description: "Login successful. Welcome back!",
+      if (isLogin) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
         });
-        navigate("/dashboard");
+
+        if (error) throw error;
+
+        if (data.user) {
+          toast({
+            title: "Welcome back!",
+            description: "Login successful. Redirecting to dashboard...",
+          });
+          navigate("/dashboard");
+        }
+      } else {
+        const { data, error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            data: {
+              full_name: formData.fullName,
+            },
+            emailRedirectTo: `${window.location.origin}/dashboard`,
+          },
+        });
+
+        if (error) throw error;
+
+        if (data.user) {
+          toast({
+            title: "Account Created!",
+            description: "Welcome to NeuotechGains! Your account has been successfully created.",
+          });
+          navigate("/dashboard");
+        }
       }
     } catch (error: any) {
       toast({
-        title: "Login Failed",
-        description: error.message || "Invalid credentials. Please try again.",
+        title: isLogin ? "Login Failed" : "Registration Failed",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -105,8 +136,22 @@ const Login = () => {
     }
   };
 
+  const toggleForm = () => {
+    setIsLogin(!isLogin);
+    setFormData({ fullName: "", email: "", password: "" });
+    setErrors({});
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-800 flex items-center justify-center p-4">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4 relative"
+      style={{
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('https://images.unsplash.com/photo-1611224923853-80b023f02d71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2339&q=80')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
       <div className="max-w-md w-full">
         <Link
           to="/"
@@ -116,29 +161,70 @@ const Login = () => {
           Back to Home
         </Link>
 
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-3xl p-8 shadow-2xl">
+        <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full mb-4">
-              <Lock className="w-8 h-8 text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-cyan-400 rounded-full mb-4">
+              <div className="text-white font-bold text-xl">NG</div>
             </div>
-            <h2 className="text-3xl font-bold text-white mb-2">Welcome Back</h2>
-            <p className="text-white/70">Sign in to your account</p>
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">
+              {isLogin ? "Welcome Back" : "Join NeuotechGains"}
+            </h2>
+            <p className="text-gray-600">
+              {isLogin 
+                ? "Sign in to boost your social media presence" 
+                : "Start growing your social media today"
+              }
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {!isLogin && (
+              <div>
+                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    id="fullName"
+                    type="text"
+                    name="fullName"
+                    value={formData.fullName || ""}
+                    onChange={handleInputChange}
+                    className={`w-full pl-12 pr-4 py-3 border ${errors.fullName ? 'border-red-400' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
+                    placeholder="Enter your full name"
+                    aria-describedby={errors.fullName ? "fullName-error" : undefined}
+                  />
+                  {errors.fullName && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <AlertCircle className="w-5 h-5 text-red-400" />
+                    </div>
+                  )}
+                </div>
+                {errors.fullName && (
+                  <p id="fullName-error" className="text-red-500 text-sm mt-1 flex items-center">
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    {errors.fullName}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
-              <label className="block text-white font-medium mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60 w-5 h-5" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
+                  id="email"
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`w-full pl-12 pr-4 py-3 bg-white/10 border ${errors.email ? 'border-red-400' : 'border-white/30'} rounded-xl text-white placeholder-white/60 focus:outline-none focus:border-white/60 focus:bg-white/20 transition-all`}
+                  className={`w-full pl-12 pr-4 py-3 border ${errors.email ? 'border-red-400' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
                   placeholder="Enter your email"
+                  aria-describedby={errors.email ? "email-error" : undefined}
                 />
                 {errors.email && (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -147,7 +233,7 @@ const Login = () => {
                 )}
               </div>
               {errors.email && (
-                <p className="text-red-300 text-sm mt-1 flex items-center">
+                <p id="email-error" className="text-red-500 text-sm mt-1 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
                   {errors.email}
                 </p>
@@ -155,29 +241,43 @@ const Login = () => {
             </div>
 
             <div>
-              <label className="block text-white font-medium mb-2">
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                {isLogin && (
+                  <Link
+                    to="/forgot-password"
+                    className="text-sm hover:underline transition-colors"
+                    style={{ color: '#00d8ff' }}
+                  >
+                    Forgot Password?
+                  </Link>
+                )}
+              </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60 w-5 h-5" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
+                  id="password"
                   type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`w-full pl-12 pr-12 py-3 bg-white/10 border ${errors.password ? 'border-red-400' : 'border-white/30'} rounded-xl text-white placeholder-white/60 focus:outline-none focus:border-white/60 focus:bg-white/20 transition-all`}
-                  placeholder="Enter your password"
+                  className={`w-full pl-12 pr-12 py-3 border ${errors.password ? 'border-red-400' : 'border-gray-300'} rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
+                  placeholder={isLogin ? "Enter your password" : "Create a password"}
+                  aria-describedby={errors.password ? "password-error" : undefined}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white transition-colors"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
               {errors.password && (
-                <p className="text-red-300 text-sm mt-1 flex items-center">
+                <p id="password-error" className="text-red-500 text-sm mt-1 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" />
                   {errors.password}
                 </p>
@@ -187,25 +287,32 @@ const Login = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold py-3 rounded-xl hover:from-blue-600 hover:to-purple-600 transition-all duration-300 hover:scale-105 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="w-full font-semibold py-3 rounded-xl text-white transition-all duration-300 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+              style={{ 
+                background: isLoading ? '#gray' : 'linear-gradient(135deg, #00d8ff 0%, #0099cc 100%)'
+              }}
             >
               {isLoading ? (
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Signing In...
+                  {isLogin ? "Signing In..." : "Creating Account..."}
                 </div>
               ) : (
-                "Sign In"
+                isLogin ? "Log In to NeuotechGains" : "Create Account"
               )}
             </button>
           </form>
 
           <div className="text-center mt-6">
-            <p className="text-white/70">
-              Don't have an account?{" "}
-              <Link to="/register" className="text-white font-semibold hover:underline">
-                Create one here
-              </Link>
+            <p className="text-gray-600">
+              {isLogin ? "Don't have an account? " : "Already have an account? "}
+              <button
+                onClick={toggleForm}
+                className="font-semibold hover:underline transition-colors"
+                style={{ color: '#00d8ff' }}
+              >
+                {isLogin ? "Sign up" : "Log in"}
+              </button>
             </p>
           </div>
         </div>
